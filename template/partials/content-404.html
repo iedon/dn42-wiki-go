@@ -1,0 +1,7 @@
+{{ define "content-404" }}
+<article class="not-found">
+    <h1>404 - Not found</h1>
+    <p>Could not find the page <code>{{ .RequestedPath }}</code> .</p>
+    <p><a href="{{ baseHref .BaseURL }}">Return to the homepage</a> or try using the search box above.</p>
+</article>
+{{ end }}

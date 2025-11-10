@@ -1,0 +1,43 @@
+{{ define "main" }}
+{{ $gridClass := "grid" }}
+{{ if not .Sections }}{{ $gridClass = printf "%s grid--no-summary" $gridClass }}{{ end }}
+{{ if and (not .Sections) (not .SidebarHTML) }}{{ $gridClass = printf "%s grid--compact" $gridClass }}{{ end }}
+
+<div class="{{$gridClass}}">
+    {{ if .Sections }}
+    <nav class="summary summary-panel" aria-label="On this page">
+        <h2>Summary</h2>
+        <ul>
+            {{ range $item := .Sections }}
+            <li data-level="{{$item.Level}}"><a data-section="#{{$item.ID}}" href="#{{$item.ID}}">{{$item.Text}}</a></li>
+            {{ end }}
+        </ul>
+    </nav>
+    {{ end }}
+
+    <div class="content">
+        {{ if and .Breadcrumbs (ne .ContentTemplate "content-404") }}
+        <p class="path" aria-label="Breadcrumb">
+            {{ range $index, $crumb := .Breadcrumbs }}
+                {{ if $crumb.Path }}
+                <a href="{{ $crumb.Path }}">{{ $crumb.Title }}</a>
+                {{ else }}
+                <span class="current-page">{{ $crumb.Title }}</span>
+                {{ end }}
+                {{ if not $crumb.Current }}<span aria-hidden="true"> &gt; </span>{{ end }}
+            {{ end }}
+        </p>
+        {{ end }}
+        {{ if eq .ContentTemplate "content-404" }}
+            {{ template "content-404" . }}
+        {{ else }}
+            {{ template "content-default" . }}
+        {{ end }}
+    </div>
+    {{ if .SidebarHTML }}
+    <aside class="sidebar sidebar-extra">
+        <div class="sidebar-block">{{ safeHTML .SidebarHTML }}</div>
+    </aside>
+    {{ end }}
+</div>
+{{ end }}

@@ -1,0 +1,94 @@
+{{ define "modals" }}
+<div id="modal-backdrop" class="modal-backdrop"></div>
+
+<div id="history-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="history-title">
+    <div class="modal-header">
+        <h2 id="history-title">Revision history</h2>
+        <div class="modal-header-actions">
+            <button type="button" class="button-secondary" id="history-load-more">Load more</button>
+            <button type="button" class="button-primary" id="history-view-diff" disabled>Show diff</button>
+            <button class="icon-button" type="button" data-close aria-label="Close history">&times;</button>
+        </div>
+    </div>
+    <div class="modal-body">
+        <div class="history-list" id="history-list"></div>
+    </div>
+</div>
+
+<div id="history-diff-modal" class="modal modal--diff" role="dialog" aria-modal="true" aria-labelledby="history-diff-title">
+    <div class="modal-header">
+        <h2 id="history-diff-title">Diff preview</h2>
+        <button class="icon-button" type="button" data-close aria-label="Close diff">&times;</button>
+    </div>
+    <div class="modal-body history-diff-body">
+        <pre id="history-diff" class="diff-view z-code" tabindex="0"><code id="history-diff-code"></code></pre>
+    </div>
+</div>
+
+<div id="path-modal" class="modal modal--narrow" role="dialog" aria-modal="true" aria-labelledby="path-modal-title">
+    <div class="modal-header">
+        <h2 id="path-modal-title">Rename Page</h2>
+        <button class="icon-button" type="button" data-close aria-label="Close dialog">&times;</button>
+    </div>
+    <div class="modal-body">
+        <div class="form-group">
+            <label for="path-input">Destination path</label>
+            <input id="path-input" type="text" placeholder="section/Page" required>
+            <p class="form-hint" id="path-hint"></p>
+        </div>
+        <p class="form-hint" id="path-status"></p>
+    </div>
+    <div class="modal-footer">
+        <div class="button-group">
+            <button type="button" class="button-secondary" data-close>Cancel</button>
+            <button type="button" class="button-primary" id="path-submit">Submit</button>
+        </div>
+    </div>
+</div>
+
+<div id="editor-modal" class="modal modal--fullscreen" role="dialog" aria-modal="true" aria-labelledby="editor-title">
+    <div class="modal-header">
+        <h2 id="editor-title">Edit Page</h2>
+        <button class="icon-button" type="button" data-close aria-label="Close editor">&times;</button>
+    </div>
+    <div class="modal-body editor-body">
+        <div class="form-group" id="editor-path-group">
+            <label for="editor-path">Path</label>
+            <input id="editor-path" type="text" placeholder="section/Page">
+            <p class="form-hint" id="editor-path-hint">Paths map to wiki routes. Leave off the .md suffix.</p>
+        </div>
+        <div class="editor-tabs" role="tablist">
+            <button type="button" data-tab="edit" class="active" role="tab" aria-selected="true">Edit</button>
+            <button type="button" data-tab="preview" role="tab" aria-selected="false">Preview</button>
+        </div>
+        <div class="editor-toolbar" id="editor-toolbar" role="toolbar" aria-label="Formatting shortcuts">
+            <button type="button" data-md="h1">H1</button>
+            <button type="button" data-md="h2">H2</button>
+            <button type="button" data-md="h3">H3</button>
+            <button type="button" data-md="bold">Bold</button>
+            <button type="button" data-md="italic">Italic</button>
+            <button type="button" data-md="code">Code</button>
+            <button type="button" data-md="quote">Quote</button>
+            <button type="button" data-md="ul">List</button>
+            <button type="button" data-md="ol">Ordered</button>
+            <button type="button" data-md="link">Link</button>
+            <button type="button" data-md="image">Image</button>
+        </div>
+        <div class="editor-workspace" id="editor-workspace">
+            <textarea id="editor-input" spellcheck="false"></textarea>
+            <div id="editor-preview" class="editor-preview hidden" aria-hidden="true"></div>
+        </div>
+    </div>
+    <div class="modal-footer">
+        <div class="form-group">
+            <label for="editor-message">Commit message</label>
+            <input id="editor-message" type="text" placeholder="Summarise your edit" required>
+        </div>
+        <div class="button-group">
+            <button type="button" class="button-secondary" data-close>Cancel</button>
+            <button type="button" class="button-primary" id="editor-save" disabled>Save</button>
+        </div>
+    </div>
+    <div class="editor-status" id="editor-status"></div>
+</div>
+{{ end }}

@@ -1,0 +1,313 @@
+body {
+    --white: #ffffff;
+    --purple: #c594c5;
+    --background: #0f1419;
+    --gutter: #20272c;
+    --gray: #bfbab0;
+    --gray-2: #5c6773;
+    --green: #c2d94c;
+    --pink: #f07178;
+    --pink-2: #ec5f67;
+    --red: #ff3333;
+    --gold: #e6b673;
+    --orange: #ff7733;
+    --orange-2: #ffb454;
+    --orange-3: #f29718;
+    --peach: #f29668;
+    --cyan: #95e6cb;
+    --blue: #59c2ff;
+    --blue-2: #39bae6;
+}
+
+body.light {
+    --background: #fafafa;
+    --gutter: #dee0e1;
+    --gray: #61676c;
+    --gray-2: #abb0b6;
+    --green: #86b300;
+    --pink: #f07171;
+    --pink-2: #ec5f67;
+    --red: #f51818;
+    --gold: #e6b673;
+    --orange: #fa6e32;
+    --orange-2: #f29718;
+    --orange-3: #ff8f40;
+    --peach: #ed9366;
+    --cyan: #4cbf99;
+    --blue: #399ee6;
+    --blue-2: #55b4d4;
+}
+
+pre.z-code,
+pre.z-chroma {
+    background-color: var(--background);
+    color: var(--gray);
+    border-radius: 0.5em;
+    padding: 0.75em 1em;
+}
+
+pre.z-code[data-lang],
+pre.z-chroma[data-lang] {
+    position: relative;
+}
+
+pre.z-code[data-lang]::before,
+pre.z-chroma[data-lang]::before {
+    content: attr(data-lang);
+    position: absolute;
+    top: 0.4rem;
+    right: 0.75rem;
+    z-index: 1;
+    pointer-events: none;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 0.1rem 0.5rem;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--gray-2);
+    border-radius: 0.4rem;
+}
+
+body.light pre.z-code[data-lang]::before,
+body.light pre.z-chroma[data-lang]::before {
+    background: rgba(0, 0, 0, 0.08);
+}
+
+pre.z-code code,
+pre.z-chroma code {
+    display: block;
+    overflow-x: auto;
+    font-family: 'Spline Sans Mono', monospace;
+    font-size: 0.95rem;
+}
+
+pre.z-code .z-line,
+pre.z-chroma .z-line {
+    display: block;
+}
+
+pre.z-code .z-cl,
+pre.z-chroma .z-cl {
+    display: inline-block;
+    min-width: 100%;
+}
+
+pre.z-code .z-hl,
+pre.z-chroma .z-hl {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+body.light pre.z-code .z-hl,
+body.light pre.z-chroma .z-hl {
+    background-color: rgba(0, 0, 0, 0.08);
+}
+
+pre.z-code .z-w,
+pre.z-chroma .z-w {
+    color: inherit;
+}
+
+pre.z-code .z-err,
+pre.z-code .z-gr,
+pre.z-chroma .z-err,
+pre.z-chroma .z-gr {
+    color: var(--red);
+}
+
+pre.z-code .z-gd,
+pre.z-chroma .z-gd {
+    color: var(--pink-2);
+}
+
+pre.z-code .z-gi,
+pre.z-chroma .z-gi {
+    color: var(--green);
+}
+
+pre.z-code .z-ge,
+pre.z-code .z-gs,
+pre.z-chroma .z-ge,
+pre.z-chroma .z-gs {
+    font-style: italic;
+}
+
+pre.z-code .z-c,
+pre.z-code .z-ch,
+pre.z-code .z-cm,
+pre.z-code .z-c1,
+pre.z-code .z-cs,
+pre.z-code .z-cp,
+pre.z-code .z-cpf,
+pre.z-chroma .z-c,
+pre.z-chroma .z-ch,
+pre.z-chroma .z-cm,
+pre.z-chroma .z-c1,
+pre.z-chroma .z-cs,
+pre.z-chroma .z-cp,
+pre.z-chroma .z-cpf {
+    color: var(--gray-2);
+    font-style: italic;
+}
+
+pre.z-code .z-k,
+pre.z-code .z-kc,
+pre.z-code .z-kd,
+pre.z-code .z-kn,
+pre.z-code .z-kp,
+pre.z-code .z-kr,
+pre.z-code .z-kt,
+pre.z-chroma .z-k,
+pre.z-chroma .z-kc,
+pre.z-chroma .z-kd,
+pre.z-chroma .z-kn,
+pre.z-chroma .z-kp,
+pre.z-chroma .z-kr,
+pre.z-chroma .z-kt {
+    color: var(--orange);
+}
+
+pre.z-code .z-o,
+pre.z-code .z-ow,
+pre.z-chroma .z-o,
+pre.z-chroma .z-ow {
+    color: var(--peach);
+}
+
+pre.z-code .z-p,
+pre.z-chroma .z-p {
+    color: var(--gray);
+}
+
+pre.z-code .z-s,
+pre.z-code .z-sa,
+pre.z-code .z-sb,
+pre.z-code .z-sc,
+pre.z-code .z-sd,
+pre.z-code .z-s1,
+pre.z-code .z-s2,
+pre.z-code .z-sh,
+pre.z-code .z-ss,
+pre.z-code .z-si,
+pre.z-code .z-sx,
+pre.z-chroma .z-s,
+pre.z-chroma .z-sa,
+pre.z-chroma .z-sb,
+pre.z-chroma .z-sc,
+pre.z-chroma .z-sd,
+pre.z-chroma .z-s1,
+pre.z-chroma .z-s2,
+pre.z-chroma .z-sh,
+pre.z-chroma .z-ss,
+pre.z-chroma .z-si,
+pre.z-chroma .z-sx {
+    color: var(--green);
+}
+
+pre.z-code .z-se,
+pre.z-code .z-sr,
+pre.z-chroma .z-se,
+pre.z-chroma .z-sr {
+    color: var(--cyan);
+}
+
+pre.z-code .z-m,
+pre.z-code .z-mb,
+pre.z-code .z-mf,
+pre.z-code .z-mh,
+pre.z-code .z-mi,
+pre.z-code .z-mo,
+pre.z-code .z-il,
+pre.z-chroma .z-m,
+pre.z-chroma .z-mb,
+pre.z-chroma .z-mf,
+pre.z-chroma .z-mh,
+pre.z-chroma .z-mi,
+pre.z-chroma .z-mo,
+pre.z-chroma .z-il {
+    color: var(--orange-3);
+}
+
+pre.z-code .z-na,
+pre.z-code .z-nd,
+pre.z-code .z-py,
+pre.z-chroma .z-na,
+pre.z-chroma .z-nd,
+pre.z-chroma .z-py {
+    color: var(--orange-2);
+}
+
+pre.z-code .z-nb,
+pre.z-code .z-bp,
+pre.z-chroma .z-nb,
+pre.z-chroma .z-bp {
+    color: var(--pink);
+}
+
+pre.z-code .z-nf,
+pre.z-code .z-fm,
+pre.z-chroma .z-nf,
+pre.z-chroma .z-fm {
+    color: var(--orange-2);
+}
+
+pre.z-code .z-nc,
+pre.z-code .z-ne,
+pre.z-code .z-ni,
+pre.z-code .z-nn,
+pre.z-chroma .z-nc,
+pre.z-chroma .z-ne,
+pre.z-chroma .z-ni,
+pre.z-chroma .z-nn {
+    color: var(--blue);
+}
+
+pre.z-code .z-nt,
+pre.z-chroma .z-nt {
+    color: var(--blue-2);
+}
+
+pre.z-code .z-nv,
+pre.z-code .z-vc,
+pre.z-code .z-vg,
+pre.z-code .z-vi,
+pre.z-code .z-vm,
+pre.z-code .z-nl,
+pre.z-code .z-no,
+pre.z-code .z-nx,
+pre.z-chroma .z-nv,
+pre.z-chroma .z-vc,
+pre.z-chroma .z-vg,
+pre.z-chroma .z-vi,
+pre.z-chroma .z-vm,
+pre.z-chroma .z-nl,
+pre.z-chroma .z-no,
+pre.z-chroma .z-nx {
+    color: var(--orange-3);
+}
+
+pre.z-code .z-l,
+pre.z-code .z-ld,
+pre.z-chroma .z-l,
+pre.z-chroma .z-ld {
+    color: var(--gold);
+}
+
+pre.z-code .z-gp,
+pre.z-code .z-go,
+pre.z-code .z-gt,
+pre.z-chroma .z-gp,
+pre.z-chroma .z-go,
+pre.z-chroma .z-gt {
+    color: var(--gray);
+}
+
+pre.z-code .z-lntd,
+pre.z-chroma .z-lntd {
+    color: var(--gray-2);
+}
+
+pre.z-code .z-ln,
+pre.z-chroma .z-ln {
+    color: var(--gray-2);
+}

@@ -1,0 +1,20 @@
+{{ define "utility" }}
+{{ if or .SearchEnabled .Editable }}
+<div class="utility-bar">
+    {{ if .SearchEnabled }}
+    <div class="search" data-search-container>
+        <input type="search" id="search-box" placeholder="Search docs" aria-label="Search documentation" autocomplete="off">
+        <div id="search-results" class="search-results hidden" role="listbox" aria-label="Search results"></div>
+    </div>
+    {{ end }}
+    {{ if .Editable }}
+    <div class="toolbar" role="toolbar" aria-label="Page actions">
+        {{ if .Buttons.EnableHistory }}<button data-action="history" type="button">History</button>{{ end }}
+        {{ if .Buttons.EnableRename }}<button data-action="rename" type="button">Rename</button>{{ end }}
+        {{ if .Buttons.EnableEdit }}<button data-action="edit" type="button">Edit</button>{{ end }}
+        {{ if .Buttons.EnableNew }}<button data-action="new" type="button">New</button>{{ end }}
+    </div>
+    {{ end }}
+</div>
+{{ end }}
+{{ end }}

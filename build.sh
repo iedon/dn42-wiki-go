@@ -1,0 +1,21 @@
+#!/bin/sh
+
+# export GOOS=linux
+# export GOARCH=amd64
+
+if [ -d ./dist ]; then
+    rm -rf ./dist
+fi
+mkdir -p ./dist
+
+go build -C ./src -o ../dist/dn42-wiki-go
+if [ $? -ne 0 ]; then
+    echo "Build failed"
+    exit 1
+fi
+
+cp -r ./template ./dist/
+cp ./config.example.json ./dist/config.json
+
+echo "Build succeeded. Artifact in ./dist"
+exit 0

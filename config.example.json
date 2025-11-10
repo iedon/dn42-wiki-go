@@ -1,0 +1,31 @@
+{
+  "live": true,
+  "editable": true,
+  "listen": ":8080",
+  "git": {
+    "binPath": "git",
+    "remote": "https://git.dn42.dev/wiki/wiki",
+    "localDirectory": "./wiki",
+    "pullIntervalSec": 300,
+    "author": "Anonymous <anonymous@localhost>",
+    "commitMessagePrefix": "[wiki] ",
+    "commitMessageAppendRemoteAddr": " (via %s)"
+  },
+  "webHook": true,
+  "webHookListen": ":8081",
+  "outputDir": "./dist",
+  "templateDir": "./template",
+  "baseUrl": "",
+  "ignoreHeader": true,
+  "ignoreFooter": false,
+  "serverFooter": "Built with DN42 Wiki Go. You are accessing a distributed wiki node hosted by [IEDON-MNT](https://iedon.net).",
+  "enableTLS": false,
+  "tlsCert": "./server.crt",
+  "tlsKey": "./server.key",
+  "logLevel": "info",
+  "trustedProxies": [
+    "127.0.0.1",
+    "::1/128"
+  ],
+  "trustedRemoteAddrLevel": 1
+}

@@ -1,0 +1,10 @@
+{{ define "content-default" }}
+<article>{{ .ContentHTML }}</article>
+{{ if or .LastUpdated .LastCommitShort }}
+<p class="doc-meta">
+    {{ if .LastUpdated }}<span>Updated <time datetime="{{ .LastUpdatedISO }}">{{ .LastUpdated }}</time></span>{{ end }}
+    {{ if and .LastUpdated .LastCommitShort }}<span aria-hidden="true">·</span>{{ end }}
+    {{ if .LastCommitShort }}<span>Commit <code class="doc-meta__hash" title="{{ .LastCommitHash }}">{{ .LastCommitShort }}</code></span>{{ end }}
+</p>
+{{ end }}
+{{ end }}

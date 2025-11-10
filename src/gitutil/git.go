@@ -1,0 +1,297 @@
+package gitutil
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+)
+
+// CommandTimeout bounds synchronous git invocations.
+const CommandTimeout = 60 * time.Second
+
+// Repository represents a cloned git repository and offers limited VCS operations.
+type Repository struct {
+	Dir     string
+	Remote  string
+	GitPath string
+	mu      sync.Mutex
+}
+
+// Commit encapsulates log metadata for UI consumption.
+type Commit struct {
+	Hash        string    `json:"hash"`
+	Author      string    `json:"author"`
+	Email       string    `json:"email"`
+	Message     string    `json:"message"`
+	CommittedAt time.Time `json:"committedAt"`
+}
+
+// NewRepository ensures the repository exists locally by cloning if needed.
+func NewRepository(gitPath, remote, dir string) (*Repository, error) {
+	repo := &Repository{Dir: dir, Remote: remote, GitPath: gitPath}
+	if err := repo.ensureClone(); err != nil {
+		return nil, err
+	}
+	return repo, nil
+}
+
+// Pull updates the repository with remote changes.
+func (r *Repository) Pull(ctx context.Context) error {
+	ctx, cancel := ensureContext(ctx)
+	defer cancel()
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	cmd := r.command(ctx, "pull", "--ff-only")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		outStr := string(out)
+		if bytes.Contains(out, []byte("You have not concluded your merge")) {
+			return fmt.Errorf("pull aborted: %s", out)
+		}
+		if needsRebaseFallback(outStr) {
+			if err := r.pullWithRebase(ctx); err != nil {
+				return err
+			}
+			return nil
+		}
+		return fmt.Errorf("git pull: %w (%s)", err, outStr)
+	}
+	return nil
+}
+
+func (r *Repository) pullWithRebase(ctx context.Context) error {
+	cmd := r.command(ctx, "pull", "--rebase")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git pull --rebase: %w (%s)", err, string(out))
+	}
+	return nil
+}
+
+func needsRebaseFallback(output string) bool {
+	markers := []string{
+		"Not possible to fast-forward",
+		"cannot fast-forward",
+		"Diverging branches",
+	}
+	for _, marker := range markers {
+		if strings.Contains(output, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+// PullPath triggers git fetch specifically for a file path to warm caches.
+func (r *Repository) PullPath(ctx context.Context, path string) error {
+	return r.Pull(ctx)
+}
+
+// Log returns paginated commit history scoped to a file path.
+func (r *Repository) Log(ctx context.Context, path string, page, pageSize int) ([]Commit, bool, error) {
+	ctx, cancel := ensureContext(ctx)
+	defer cancel()
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	offset := page * pageSize
+	args := []string{"log", fmt.Sprintf("--skip=%d", offset), fmt.Sprintf("-n%d", pageSize+1), "--date=unix", "--pretty=%H%x00%an%x00%ae%x00%at%x00%s"}
+	if path != "" {
+		args = append(args, "--", filepath.ToSlash(path))
+	}
+	cmd := r.command(ctx, args...)
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, false, fmt.Errorf("git log: %w", err)
+	}
+
+	lines := bytes.Split(bytes.TrimSpace(out), []byte("\n"))
+	hasMore := false
+	if len(lines) > pageSize {
+		hasMore = true
+		lines = lines[:pageSize]
+	}
+
+	commits := make([]Commit, 0, len(lines))
+	for _, ln := range lines {
+		parts := bytes.Split(ln, []byte{0})
+		if len(parts) != 5 {
+			continue
+		}
+		seconds, err := parseUnix(parts[3])
+		if err != nil {
+			return nil, false, err
+		}
+		commits = append(commits, Commit{
+			Hash:        string(parts[0]),
+			Author:      string(parts[1]),
+			Email:       string(parts[2]),
+			CommittedAt: time.Unix(seconds, 0).UTC(),
+			Message:     string(parts[4]),
+		})
+	}
+
+	return commits, hasMore, nil
+}
+
+// Diff renders a colored diff between two commits for a path.
+func (r *Repository) Diff(ctx context.Context, path, from, to string) (string, error) {
+	ctx, cancel := ensureContext(ctx)
+	defer cancel()
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if from == "" || to == "" {
+		return "", errors.New("from and to commit hashes are required")
+	}
+	args := []string{"diff", fmt.Sprintf("%s..%s", from, to), "--", filepath.ToSlash(path)}
+	cmd := r.command(ctx, args...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("git diff: %w (%s)", err, string(out))
+	}
+	return string(out), nil
+}
+
+// ReadFile reads repository content at HEAD.
+func (r *Repository) ReadFile(path string) ([]byte, error) {
+	full := filepath.Join(r.Dir, filepath.FromSlash(path))
+	return os.ReadFile(full)
+}
+
+// WriteFile writes to a file inside the repository.
+func (r *Repository) WriteFile(path string, data []byte) error {
+	full := filepath.Join(r.Dir, filepath.FromSlash(path))
+	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(full, data, 0o644)
+}
+
+// Rename moves a file to the desired destination using git mv.
+func (r *Repository) Rename(ctx context.Context, oldPath, newPath string) error {
+	ctx, cancel := ensureContext(ctx)
+	defer cancel()
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	cmd := r.command(ctx, "mv", filepath.ToSlash(oldPath), filepath.ToSlash(newPath))
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git mv: %w (%s)", err, string(out))
+	}
+	return nil
+}
+
+// CommitChanges stages and commits files with provided message.
+func (r *Repository) CommitChanges(ctx context.Context, paths []string, message string, author string) error {
+	if strings.TrimSpace(message) == "" {
+		return errors.New("commit message required")
+	}
+
+	ctx, cancel := ensureContext(ctx)
+	defer cancel()
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	stageArgs := []string{"add", "--all"}
+	stageArgs = append(stageArgs, normalizePaths(paths)...)
+	cmd := r.command(ctx, stageArgs...)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git add: %w (%s)", err, string(out))
+	}
+
+	commitArgs := []string{"commit", "-m", message}
+	if author != "" {
+		commitArgs = append(commitArgs, "--author", author)
+	}
+	cmd = r.command(ctx, commitArgs...)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git commit: %w (%s)", err, string(out))
+	}
+	return nil
+}
+
+// ListTrackedFiles returns all tracked files.
+func (r *Repository) ListTrackedFiles(ctx context.Context) ([]string, error) {
+	ctx, cancel := ensureContext(ctx)
+	defer cancel()
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	cmd := r.command(ctx, "ls-files")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("git ls-files: %w", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(lines) == 1 && lines[0] == "" {
+		return []string{}, nil
+	}
+	return lines, nil
+}
+
+func (r *Repository) ensureClone() error {
+	if _, err := os.Stat(filepath.Join(r.Dir, ".git")); err == nil {
+		return nil
+	}
+
+	if err := os.MkdirAll(r.Dir, 0o755); err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), CommandTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, r.GitPath, "clone", "--depth", "1", r.Remote, r.Dir)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git clone: %w (%s)", err, string(out))
+	}
+	return nil
+}
+
+func (r *Repository) command(ctx context.Context, args ...string) *exec.Cmd {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	cmd := exec.CommandContext(ctx, r.GitPath, args...)
+	cmd.Dir = r.Dir
+	return cmd
+}
+
+func ensureContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	if ctx != nil {
+		return ctx, func() {}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), CommandTimeout)
+	return ctx, cancel
+}
+
+func normalizePaths(paths []string) []string {
+	result := make([]string, 0, len(paths))
+	for _, p := range paths {
+		if strings.TrimSpace(p) == "" {
+			continue
+		}
+		result = append(result, filepath.ToSlash(p))
+	}
+	return result
+}
+
+func parseUnix(raw []byte) (int64, error) {
+	return strconv.ParseInt(string(raw), 10, 64)
+}

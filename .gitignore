@@ -1,0 +1,11 @@
+dist
+wiki
+wiki-ng
+config.json
+config.debug.json
+node_modules/
+.env
+.DS_Store
+dn42-wiki-go
+dn42-wiki-go.exe
+src/go.sum
