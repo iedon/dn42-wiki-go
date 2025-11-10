@@ -5,6 +5,7 @@ After=dn42-wiki-go.socket
 After=network.target
 
 [Service]
+NonBlocking=true
 User=www-data
 Restart=always
 RestartSec=10s

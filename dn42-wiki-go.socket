@@ -4,6 +4,7 @@ PartOf=dn42-wiki-go.service
 
 [Socket]
 Accept=no
+NoDelay=true
 ListenStream=/run/dn42-wiki-go.sock
 SocketGroup=www-data
 SocketMode=0660

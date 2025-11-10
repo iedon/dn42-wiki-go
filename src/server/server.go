@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -105,12 +106,53 @@ func (s *Server) routes() {
 }
 
 func (s *Server) listen(address string) (net.Listener, error) {
+	if listener, ok, err := s.systemdListener(); err != nil {
+		return nil, err
+	} else if ok {
+		return listener, nil
+	}
 	if after, ok := strings.CutPrefix(address, "unix:"); ok {
 		path := after
 		_ = os.Remove(path)
 		return net.Listen("unix", path)
 	}
 	return net.Listen("tcp", address)
+}
+
+func (s *Server) systemdListener() (net.Listener, bool, error) {
+	pidEnv := strings.TrimSpace(os.Getenv("LISTEN_PID"))
+	if pidEnv == "" {
+		return nil, false, nil
+	}
+	pid, err := strconv.Atoi(pidEnv)
+	if err != nil || pid != os.Getpid() {
+		return nil, false, nil
+	}
+	fdsEnv := strings.TrimSpace(os.Getenv("LISTEN_FDS"))
+	if fdsEnv == "" {
+		return nil, false, nil
+	}
+	fds, err := strconv.Atoi(fdsEnv)
+	if err != nil {
+		return nil, false, fmt.Errorf("systemd listener: invalid LISTEN_FDS: %w", err)
+	}
+	if fds <= 0 {
+		return nil, false, nil
+	}
+	const sdListenFdsStart = 3
+	file := os.NewFile(uintptr(sdListenFdsStart), fmt.Sprintf("systemd-fd-%d", sdListenFdsStart))
+	if file == nil {
+		return nil, false, fmt.Errorf("systemd listener: failed to access fd")
+	}
+	listener, err := net.FileListener(file)
+	_ = file.Close()
+	if err != nil {
+		return nil, false, fmt.Errorf("systemd listener: %w", err)
+	}
+	_ = os.Unsetenv("LISTEN_PID")
+	_ = os.Unsetenv("LISTEN_FDS")
+	_ = os.Unsetenv("LISTEN_FDNAMES")
+	return listener, true, nil
 }
 
 func (s *Server) logRequests(next http.Handler) http.Handler {
