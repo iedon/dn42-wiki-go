@@ -25,8 +25,8 @@ This project aims to replace the old, Gollum based DN42 distributed wiki.
 
 ## Webhook endpoints
 When `webHook` is `true` the process listens on `webHookListen` (default `:8081`) and exposes:
-- `POST /webhook/pull` – triggers `git pull` and cache refresh.
-- `POST /webhook/push` – triggers `git push` if a remote is configured.
+- `GET /webhook/pull` – triggers `git pull` and cache refresh.
+- `GET /webhook/push` – triggers `git push` if a remote is configured.
 If `webHookAuthPreShared` is non-empty, requests must include `Authorization: Bearer <token>` with a token that matches exactly.
 
 ## Configuration reference
@@ -78,4 +78,4 @@ Configuration is supplied as JSON. Below is a description of every option and th
 - When `git.remote` is empty the application initialises a standalone repository and skips pull/push work.
 - Template assets are copied into the static build; editing them requires rebuilding or re-running the server to refresh caches.
 
-Refer to `config.debug.json` and `config.example.json` for starter setups, and see `nginx-vhost.conf` for a sample reverse-proxy configuration.
+Refer to `config.example.json` for starter setups, and see `nginx-vhost.conf` for a sample reverse-proxy configuration.
