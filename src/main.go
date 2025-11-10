@@ -19,11 +19,16 @@ import (
 
 func main() {
 	cfgPath := flag.String("config", "config.json", "path to configuration file")
+	buildFlag := flag.Bool("build", false, "force static build mode")
 	flag.Parse()
 
 	cfg, err := config.Load(*cfgPath)
 	if err != nil {
 		panic(err)
+	}
+
+	if *buildFlag {
+		cfg.Live = false
 	}
 
 	logger := newLogger(cfg.LogLevel)

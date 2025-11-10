@@ -20,7 +20,12 @@ This project aims to replace the old, Gollum based DN42 distributed wiki.
    export GOARCH=amd64
    ./build.sh
    ```
-4. For a static export instead, set `"live": false` in the config and run the binary; rendered HTML will appear in `outputDir` (default `./dist`).
+4. For a static export instead, set `"live": false` in the config and run the binary, or run with `--build` flag; rendered HTML will appear in `outputDir` (default `./dist`):
+   ```bash
+   # Use CLI to generate site
+   # The flag will force treating config.live as false
+   ./dn42-wiki-go --build
+   ```
 5. Use `build.sh` for a one-shot build that drops the binary, templates, and example config into `dist/`.
 
 ## Webhook endpoints

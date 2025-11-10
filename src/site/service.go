@@ -134,7 +134,13 @@ func (s *Service) Pull(ctx context.Context) error {
 	if err := s.repo.Pull(ctx); err != nil {
 		return err
 	}
-	return s.Warm(ctx)
+	if err := s.Warm(ctx); err != nil {
+		return err
+	}
+	if err := s.BuildStatic(ctx); err != nil {
+		return fmt.Errorf("build static: %w", err)
+	}
+	return nil
 }
 
 // Push synchronizes local commits to the configured remote.

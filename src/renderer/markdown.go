@@ -6,8 +6,6 @@ import (
 	"strings"
 
 	chromahtml "github.com/alecthomas/chroma/v2/formatters/html"
-	"github.com/tdewolff/minify/v2"
-	"github.com/tdewolff/minify/v2/html"
 	"github.com/yuin/goldmark"
 	highlighting "github.com/yuin/goldmark-highlighting/v2"
 	meta "github.com/yuin/goldmark-meta"
@@ -35,8 +33,7 @@ type RenderResult struct {
 
 // Renderer transforms markdown sources into HTML fragments.
 type Renderer struct {
-	md       goldmark.Markdown
-	minifier *minify.M
+	md goldmark.Markdown
 }
 
 // New constructs a renderer with GitHub-flavored markdown extensions and syntax highlighting.
@@ -69,19 +66,7 @@ func New() *Renderer {
 		),
 	)
 
-	m := minify.New()
-	m.Add("text/html", &html.Minifier{
-		KeepComments:            false,
-		KeepConditionalComments: false,
-		KeepSpecialComments:     false,
-		KeepDefaultAttrVals:     false,
-		KeepDocumentTags:        false,
-		KeepEndTags:             false,
-		KeepQuotes:              false,
-		KeepWhitespace:          false,
-	})
-
-	return &Renderer{md: md, minifier: m}
+	return &Renderer{md: md}
 }
 
 // Render converts the provided markdown into HTML and extracts metadata for navigation and search.
@@ -129,17 +114,12 @@ func (r *Renderer) Render(src []byte) (*RenderResult, error) {
 		return nil, err
 	}
 
-	htmlBytes, err := r.minifier.Bytes("text/html", buf.Bytes())
-	if err != nil {
-		return nil, err
-	}
-
-	return &RenderResult{HTML: htmlBytes, PlainText: strings.TrimSpace(plainBuilder.String()), Headings: headings}, nil
+	return &RenderResult{HTML: buf.Bytes(), PlainText: strings.TrimSpace(plainBuilder.String()), Headings: headings}, nil
 }
 
 // MinifyHTML optimizes raw HTML markup.
 func (r *Renderer) MinifyHTML(raw []byte) ([]byte, error) {
-	return r.minifier.Bytes("text/html", raw)
+	return raw, nil
 }
 
 func extractText(root ast.Node, source []byte) string {

@@ -20,10 +20,11 @@ import (
 
 // Server ties HTTP handlers to the site service.
 type Server struct {
-	cfg    *config.Config
-	svc    *site.Service
-	logger *slog.Logger
-	mux    *http.ServeMux
+	cfg                 *config.Config
+	svc                 *site.Service
+	logger              *slog.Logger
+	mux                 *http.ServeMux
+	trustForwardHeaders bool
 }
 
 // New constructs a server instance.
@@ -31,7 +32,7 @@ func New(cfg *config.Config, svc *site.Service, logger *slog.Logger) *Server {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	}
-	srv := &Server{cfg: cfg, svc: svc, logger: logger, mux: http.NewServeMux()}
+	srv := &Server{cfg: cfg, svc: svc, logger: logger, mux: http.NewServeMux(), trustForwardHeaders: true}
 	srv.routes()
 	return srv
 }
@@ -41,10 +42,20 @@ func (s *Server) Start(ctx context.Context) error {
 	if err := s.svc.Warm(ctx); err != nil {
 		return fmt.Errorf("warm service: %w", err)
 	}
+	if err := s.svc.BuildStatic(ctx); err != nil {
+		s.logger.Warn("static build", "error", err)
+	}
 
 	listener, err := s.listen(s.cfg.Listen)
 	if err != nil {
 		return err
+	}
+	if listener != nil {
+		if addr := listener.Addr(); addr != nil && addr.Network() == "unix" {
+			s.trustForwardHeaders = false
+		} else {
+			s.trustForwardHeaders = true
+		}
 	}
 
 	server := &http.Server{
