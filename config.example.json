@@ -18,6 +18,7 @@
   "outputDir": "./dist",
   "templateDir": "./template",
   "homeDoc": "Home.md",
+  "siteName": "DN42 Wiki",
   "baseUrl": "",
   "ignoreHeader": true,
   "ignoreFooter": false,

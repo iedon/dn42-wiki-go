@@ -26,3 +26,20 @@ func summarize(plain string) string {
 	}
 	return plain[:200] + "..."
 }
+
+func metaDescription(summary, fallback string) string {
+	const limit = 160
+	text := strings.TrimSpace(summary)
+	if text == "" {
+		text = strings.TrimSpace(fallback)
+	}
+	if text == "" {
+		return ""
+	}
+	text = strings.Join(strings.Fields(text), " ")
+	runes := []rune(text)
+	if len(runes) <= limit {
+		return text
+	}
+	return string(runes[:limit-1]) + "..."
+}

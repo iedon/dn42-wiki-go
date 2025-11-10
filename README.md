@@ -42,6 +42,7 @@ Configuration is supplied as JSON. Below is a description of every option and th
 - `editable` *(bool, default `false`)*: Allow write endpoints (save, rename, new page). When `false` the UI becomes read-only.
 - `listen` *(string, default `":8080"`)*: Address for the main HTTP server. Supports TCP (`host:port`) or `unix:/path`.
 - `baseUrl` *(string, default empty)*: Optional URL prefix for hosting under a subdirectory. Used in generated links and search index URLs.
+- `siteName` *(string, default `"DN42 Wiki Go"`)*: Site Name.
 
 ### Git
 - `git.binPath` *(string, default `git`)*: Path to the Git executable.

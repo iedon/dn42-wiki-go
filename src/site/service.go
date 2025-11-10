@@ -50,12 +50,22 @@ func (s *Service) Warm(ctx context.Context) error {
 
 // BuildStatic renders the entire repository into static HTML assets.
 func (s *Service) BuildStatic(ctx context.Context) error {
-	if err := os.RemoveAll(s.cfg.OutputDir); err != nil {
-		return fmt.Errorf("clean output dir: %w", err)
+	finalDir := s.cfg.OutputDir
+	parent := filepath.Dir(finalDir)
+	if parent == "" {
+		parent = "."
 	}
-	if err := os.MkdirAll(s.cfg.OutputDir, 0o755); err != nil {
-		return fmt.Errorf("create output dir: %w", err)
+
+	tempDir, err := os.MkdirTemp(parent, ".__build-")
+	if err != nil {
+		return fmt.Errorf("create temp output dir: %w", err)
 	}
+	cleanTemp := true
+	defer func() {
+		if cleanTemp && tempDir != "" {
+			_ = os.RemoveAll(tempDir)
+		}
+	}()
 
 	if err := s.refreshLayout(ctx); err != nil {
 		return err
@@ -79,16 +89,19 @@ func (s *Service) BuildStatic(ctx context.Context) error {
 			continue
 		}
 		src := filepath.Join(s.repo.Dir, filepath.FromSlash(file))
-		dst := filepath.Join(s.cfg.OutputDir, filepath.FromSlash(file))
+		dst := filepath.Join(tempDir, filepath.FromSlash(file))
 		if err := fsutil.CopyFile(src, dst); err != nil {
 			return fmt.Errorf("copy asset %s: %w", file, err)
 		}
 	}
 
-	if err := s.writeDocuments(docs); err != nil {
+	if err := s.writeDocuments(tempDir, docs); err != nil {
 		return err
 	}
-	if err := s.writeDirectoryPage(ctx); err != nil {
+	if err := s.writeDirectoryPage(ctx, tempDir); err != nil {
+		return err
+	}
+	if err := s.writeNotFoundPage(ctx, tempDir); err != nil {
 		return err
 	}
 
@@ -96,22 +109,43 @@ func (s *Service) BuildStatic(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(s.cfg.OutputDir, "search-index.json"), indexJSON, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(tempDir, "search-index.json"), indexJSON, 0o644); err != nil {
 		return fmt.Errorf("write search index: %w", err)
 	}
 	s.search.Update(indexJSON)
 
 	if s.templates.StaticDir != "" {
-		dst := filepath.Join(s.cfg.OutputDir, "theme")
+		dst := filepath.Join(tempDir, "theme")
 		if err := fsutil.CopyTree(s.templates.StaticDir, dst); err != nil {
 			return fmt.Errorf("copy theme assets: %w", err)
 		}
 	}
 
-	if err := s.writeHomeAliases(docs); err != nil {
+	if err := s.writeHomeAliases(tempDir, docs); err != nil {
 		return err
 	}
 
+	if err := os.MkdirAll(parent, 0o755); err != nil {
+		return fmt.Errorf("ensure output parent: %w", err)
+	}
+
+	backupDir := finalDir + ".old"
+	if err := os.RemoveAll(backupDir); err != nil {
+		return fmt.Errorf("clean backup dir: %w", err)
+	}
+
+	if err := os.Rename(finalDir, backupDir); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("rotate old output: %w", err)
+	}
+
+	if err := os.Rename(tempDir, finalDir); err != nil {
+		_ = os.Rename(backupDir, finalDir)
+		return fmt.Errorf("activate new output: %w", err)
+	}
+
+	_ = os.RemoveAll(backupDir)
+	cleanTemp = false
+	tempDir = ""
 	return nil
 }
 

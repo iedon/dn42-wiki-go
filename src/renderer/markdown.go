@@ -118,6 +118,7 @@ func (r *Renderer) Render(src []byte) (*RenderResult, error) {
 }
 
 // MinifyHTML optimizes raw HTML markup.
+// Currently a no-op, does not modify the input.
 func (r *Renderer) MinifyHTML(raw []byte) ([]byte, error) {
 	return raw, nil
 }

@@ -26,6 +26,7 @@ type Engine struct {
 // PageData represents the data model expected by the default layout.
 type PageData struct {
 	Title            string
+	PageTitle        string
 	HeaderHTML       template.HTML
 	FooterHTML       template.HTML
 	ServerFooterHTML template.HTML
@@ -40,7 +41,6 @@ type PageData struct {
 	Buttons          PageButtons
 	SearchIndexURL   string
 	Live             bool
-	RepositoryURL    string
 	BaseURL          string
 	Breadcrumbs      []Breadcrumb
 	LastUpdatedISO   string
@@ -48,6 +48,14 @@ type PageData struct {
 	LastCommitHash   string
 	LastCommitShort  string
 	Directory        []*DirectoryEntry
+	Meta             Meta
+}
+
+// Meta holds SEO-oriented metadata for the rendered page.
+type Meta struct {
+	Description   string
+	OpenGraphType string
+	OpenGraphSite string
 }
 
 // TOCEntry models a single heading for sidebar navigation.

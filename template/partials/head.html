@@ -2,7 +2,18 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ .Title }}</title>
+    {{- $pageTitle := .PageTitle -}}
+    <title>{{ if $pageTitle }}{{ $pageTitle }}{{ else }}{{ .Title }}{{ end }}</title>
+    {{- if .Meta.Description }}
+    <meta name="description" content="{{ .Meta.Description }}">
+    <meta property="og:description" content="{{ .Meta.Description }}">
+    {{- end }}
+    <meta property="og:title" content="{{ if $pageTitle }}{{ $pageTitle }}{{ else }}{{ .Title }}{{ end }}">
+    <meta property="og:type" content="{{ if .Meta.OpenGraphType }}{{ .Meta.OpenGraphType }}{{ else }}website{{ end }}">
+    {{- if .Meta.OpenGraphSite }}
+    <meta property="og:site_name" content="{{ .Meta.OpenGraphSite }}">
+    {{- end }}
+    <meta property="og:locale" content="en_US">
     <link rel="icon" href="/theme/favicon.ico">
     <link rel="stylesheet" href="/theme/style.css">
     <link rel="stylesheet" href="/theme/highlight.css">

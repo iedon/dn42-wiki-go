@@ -40,6 +40,7 @@ type Config struct {
 	TemplateDir            string         `json:"templateDir"`
 	HomeDoc                string         `json:"homeDoc"`
 	BaseURL                string         `json:"baseUrl"`
+	SiteName               string         `json:"siteName"`
 	IgnoreHeader           bool           `json:"ignoreHeader"`
 	IgnoreFooter           bool           `json:"ignoreFooter"`
 	ServerFooter           string         `json:"serverFooter"`
@@ -130,6 +131,12 @@ func (c *Config) applyDefaults() error {
 	}
 	c.WebhookAuthPreShared = strings.TrimSpace(c.WebhookAuthPreShared)
 	c.HomeDoc = normalizeHomeDoc(c.HomeDoc)
+
+	c.SiteName = strings.TrimSpace(c.SiteName)
+	if c.SiteName == "" {
+		c.SiteName = "DN42 Wiki Go"
+	}
+
 	c.Git.BinPath = strings.TrimSpace(c.Git.BinPath)
 	c.Git.Remote = strings.TrimSpace(c.Git.Remote)
 	c.Git.LocalDirectory = strings.TrimSpace(c.Git.LocalDirectory)

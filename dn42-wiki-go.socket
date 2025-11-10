@@ -1,0 +1,12 @@
+[Unit]
+Description=DN42 Wiki Go Unix Domain Socket
+PartOf=dn42-wiki-go.service
+
+[Socket]
+Accept=no
+ListenStream=/run/dn42-wiki-go.sock
+SocketGroup=www-data
+SocketMode=0660
+
+[Install]
+WantedBy=sockets.target

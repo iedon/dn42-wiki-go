@@ -1,0 +1,15 @@
+[Unit]
+Description=DN42 Wiki Go
+Requires=dn42-wiki-go.socket
+After=dn42-wiki-go.socket
+After=network.target
+
+[Service]
+User=www-data
+Restart=always
+RestartSec=10s
+WorkingDirectory=/opt/dn42-wiki-go
+ExecStart=/opt/dn42-wiki-go/dn42-wiki-go --config /opt/dn42-wiki-go/config.json
+
+[Install]
+WantedBy=multi-user.target

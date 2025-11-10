@@ -68,7 +68,16 @@ func (s *Service) RenderNotFoundPage(ctx context.Context, requestedPath string) 
 	data.Buttons = templatex.PageButtons{}
 	data.ContentTemplate = templatex.NotFoundContentTemplate
 	data.ActivePath = ""
-	data.RequestedPath = sanitizeRequestedPath(requestedPath)
+	sanitized := strings.TrimSpace(requestedPath)
+	if sanitized != "" {
+		sanitized = sanitizeRequestedPath(sanitized)
+	}
+	data.RequestedPath = sanitized
+	description := "The page you are looking for could not be found."
+	if sanitized != "" && sanitized != "/" {
+		description = fmt.Sprintf("The requested path %s could not be found.", sanitized)
+	}
+	data.Meta = s.buildMeta("", description, description, "website")
 
 	var buf bytes.Buffer
 	if err := s.templates.Render(&buf, data); err != nil {
@@ -110,6 +119,7 @@ func (s *Service) renderDocuments(ctx context.Context, files []string) ([]page, 
 
 func (s *Service) pageData(doc page) *templatex.PageData {
 	snapshot := s.layout.Snapshot()
+	pageTitle := s.pageTitle(doc.Title)
 
 	var lastUpdatedISO, lastUpdated, lastCommitShort string
 	if !doc.LastMod.IsZero() {
@@ -124,8 +134,9 @@ func (s *Service) pageData(doc page) *templatex.PageData {
 		}
 	}
 
-	return &templatex.PageData{
+	data := &templatex.PageData{
 		Title:            doc.Title,
+		PageTitle:        pageTitle,
 		HeaderHTML:       snapshot.Header,
 		FooterHTML:       snapshot.Footer,
 		ServerFooterHTML: snapshot.ServerFooter,
@@ -145,7 +156,6 @@ func (s *Service) pageData(doc page) *templatex.PageData {
 		},
 		SearchIndexURL:  path.Join("/", s.cfg.BaseURL, "search-index.json"),
 		Live:            s.cfg.Live,
-		RepositoryURL:   s.cfg.Git.Remote,
 		BaseURL:         s.cfg.BaseURL,
 		Breadcrumbs:     buildBreadcrumbs(doc.Route, doc.Title, s.cfg.BaseURL),
 		LastUpdatedISO:  lastUpdatedISO,
@@ -153,6 +163,8 @@ func (s *Service) pageData(doc page) *templatex.PageData {
 		LastCommitHash:  doc.LastHash,
 		LastCommitShort: lastCommitShort,
 	}
+	data.Meta = s.buildMeta(doc.Route, doc.Summary, doc.Title, "article")
+	return data
 }
 
 func (s *Service) directoryPageData(ctx context.Context) (*templatex.PageData, error) {
@@ -161,9 +173,11 @@ func (s *Service) directoryPageData(ctx context.Context) (*templatex.PageData, e
 	if err != nil {
 		return nil, err
 	}
+	title := directoryPageTitle
 
-	return &templatex.PageData{
-		Title:            directoryPageTitle,
+	data := &templatex.PageData{
+		Title:            title,
+		PageTitle:        s.pageTitle(title),
 		HeaderHTML:       snapshot.Header,
 		FooterHTML:       snapshot.Footer,
 		ServerFooterHTML: snapshot.ServerFooter,
@@ -176,16 +190,17 @@ func (s *Service) directoryPageData(ctx context.Context) (*templatex.PageData, e
 		Buttons:          templatex.PageButtons{},
 		SearchIndexURL:   path.Join("/", s.cfg.BaseURL, "search-index.json"),
 		Live:             s.cfg.Live,
-		RepositoryURL:    s.cfg.Git.Remote,
 		BaseURL:          s.cfg.BaseURL,
 		Breadcrumbs: []templatex.Breadcrumb{
 			{Title: directoryPageTitle, Current: true},
 		},
 		Directory: entries,
-	}, nil
+	}
+	data.Meta = s.buildMeta(directoryPageRoute, "Browse the complete documentation index.", directoryPageTitle, "website")
+	return data, nil
 }
 
-func (s *Service) writeDocuments(docs []page) error {
+func (s *Service) writeDocuments(baseDir string, docs []page) error {
 	for _, doc := range docs {
 		data := s.pageData(doc)
 		var buf bytes.Buffer
@@ -198,7 +213,7 @@ func (s *Service) writeDocuments(docs []page) error {
 			return fmt.Errorf("minify %s: %w", doc.Route, err)
 		}
 
-		target := filepath.Join(s.cfg.OutputDir, filepath.FromSlash(doc.OutputPath))
+		target := filepath.Join(baseDir, filepath.FromSlash(doc.OutputPath))
 		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 			return err
 		}
@@ -209,7 +224,7 @@ func (s *Service) writeDocuments(docs []page) error {
 	return nil
 }
 
-func (s *Service) writeDirectoryPage(ctx context.Context) error {
+func (s *Service) writeDirectoryPage(ctx context.Context, baseDir string) error {
 	data, err := s.directoryPageData(ctx)
 	if err != nil {
 		return err
@@ -222,18 +237,31 @@ func (s *Service) writeDirectoryPage(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("minify directory page: %w", err)
 	}
-	output := filepath.Join(s.cfg.OutputDir, directoryPageOutput)
+	output := filepath.Join(baseDir, directoryPageOutput)
 	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil {
 		return err
 	}
 	return os.WriteFile(output, minified, 0o644)
 }
 
-func (s *Service) writeHomeAliases(docs []page) error {
+func (s *Service) writeNotFoundPage(ctx context.Context, baseDir string) error {
+	// Pre-render a themed 404 page so static hosting setups can serve it directly.
+	pageBytes, err := s.RenderNotFoundPage(ctx, "")
+	if err != nil {
+		return err
+	}
+	output := filepath.Join(baseDir, "404.html")
+	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(output, pageBytes, 0o644)
+}
+
+func (s *Service) writeHomeAliases(baseDir string, docs []page) error {
 	for _, doc := range docs {
 		if strings.EqualFold(doc.Source, ensureHomeDoc(s.cfg.HomeDoc)) {
-			alias := filepath.Join(s.cfg.OutputDir, "index.html")
-			target := filepath.Join(s.cfg.OutputDir, filepath.FromSlash(doc.OutputPath))
+			alias := filepath.Join(baseDir, "index.html")
+			target := filepath.Join(baseDir, filepath.FromSlash(doc.OutputPath))
 			if err := fsutil.CopyFile(target, alias); err != nil {
 				return fmt.Errorf("create home alias: %w", err)
 			}
@@ -241,4 +269,43 @@ func (s *Service) writeHomeAliases(docs []page) error {
 		}
 	}
 	return nil
+}
+
+func (s *Service) buildMeta(route, summary, fallback, ogType string) templatex.Meta {
+	if ogType == "" {
+		ogType = "website"
+	}
+	description := metaDescription(summary, fallback)
+	if description == "" {
+		description = s.siteName()
+	}
+	return templatex.Meta{
+		Description:   description,
+		OpenGraphType: ogType,
+		OpenGraphSite: s.siteName(),
+	}
+}
+
+func (s *Service) siteName() string {
+	name := strings.TrimSpace(s.cfg.SiteName)
+	if name == "" {
+		name = deriveTitle(ensureHomeDoc(s.cfg.HomeDoc))
+	}
+	name = strings.TrimSpace(name)
+	if name == "" || strings.EqualFold(name, "Untitled") {
+		return "Untitled"
+	}
+	return name
+}
+
+func (s *Service) pageTitle(raw string) string {
+	title := strings.TrimSpace(raw)
+	site := s.siteName()
+	if title == "" {
+		return site
+	}
+	if site == "" {
+		return title
+	}
+	return fmt.Sprintf("%s - %s", title, site)
 }
