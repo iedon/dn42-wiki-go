@@ -22,13 +22,13 @@ func (s *Service) RenderPage(ctx context.Context, relPath string) (*templatex.Pa
 		return nil, err
 	}
 
-	norm, err := normalizeRelPath(relPath)
+	norm, err := normalizeRelPath(relPath, s.cfg.HomeDoc)
 	if err != nil {
 		return nil, err
 	}
 
 	if isDirectoryRoute(norm) {
-		return s.directoryPageData(), nil
+		return s.directoryPageData(ctx)
 	}
 
 	doc, err := s.documents.RenderDocument(ctx, norm)
@@ -155,11 +155,11 @@ func (s *Service) pageData(doc page) *templatex.PageData {
 	}
 }
 
-func (s *Service) directoryPageData() *templatex.PageData {
+func (s *Service) directoryPageData(ctx context.Context) (*templatex.PageData, error) {
 	snapshot := s.layout.Snapshot()
-	content := snapshot.Sidebar
-	if len(content) == 0 {
-		content = template.HTML("<p>No sidebar content available.</p>")
+	entries, err := s.directoryEntries(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	return &templatex.PageData{
@@ -167,13 +167,12 @@ func (s *Service) directoryPageData() *templatex.PageData {
 		HeaderHTML:       snapshot.Header,
 		FooterHTML:       snapshot.Footer,
 		ServerFooterHTML: snapshot.ServerFooter,
-		SidebarHTML:      template.HTML(""),
-		ContentHTML:      content,
-		ContentTemplate:  templatex.DefaultContentTemplate,
+		SidebarHTML:      snapshot.Sidebar,
+		ContentTemplate:  templatex.DirectoryContentTemplate,
 		ActivePath:       directoryPageRoute,
 		RequestedPath:    directoryPageRoute,
 		SearchEnabled:    true,
-		Editable:         s.cfg.Editable,
+		Editable:         false,
 		Buttons:          templatex.PageButtons{},
 		SearchIndexURL:   path.Join("/", s.cfg.BaseURL, "search-index.json"),
 		Live:             s.cfg.Live,
@@ -182,7 +181,8 @@ func (s *Service) directoryPageData() *templatex.PageData {
 		Breadcrumbs: []templatex.Breadcrumb{
 			{Title: directoryPageTitle, Current: true},
 		},
-	}
+		Directory: entries,
+	}, nil
 }
 
 func (s *Service) writeDocuments(docs []page) error {
@@ -209,8 +209,11 @@ func (s *Service) writeDocuments(docs []page) error {
 	return nil
 }
 
-func (s *Service) writeDirectoryPage() error {
-	data := s.directoryPageData()
+func (s *Service) writeDirectoryPage(ctx context.Context) error {
+	data, err := s.directoryPageData(ctx)
+	if err != nil {
+		return err
+	}
 	var buf bytes.Buffer
 	if err := s.templates.Render(&buf, data); err != nil {
 		return err
@@ -228,7 +231,7 @@ func (s *Service) writeDirectoryPage() error {
 
 func (s *Service) writeHomeAliases(docs []page) error {
 	for _, doc := range docs {
-		if strings.EqualFold(doc.Source, "Home.md") {
+		if strings.EqualFold(doc.Source, ensureHomeDoc(s.cfg.HomeDoc)) {
 			alias := filepath.Join(s.cfg.OutputDir, "index.html")
 			target := filepath.Join(s.cfg.OutputDir, filepath.FromSlash(doc.OutputPath))
 			if err := fsutil.CopyFile(target, alias); err != nil {

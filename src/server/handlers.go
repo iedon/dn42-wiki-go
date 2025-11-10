@@ -204,7 +204,7 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 
 	path := strings.TrimPrefix(r.URL.Path, "/")
 	if path == "" {
-		path = "Home"
+		path = s.cfg.HomeDoc
 	}
 
 	html, err := s.svc.RenderFullPage(r.Context(), path)

@@ -12,6 +12,7 @@ const RESERVED_PATHS = new Set([
   "root",
   "default",
   "theme",
+  "api",
 ]);
 
 export function createEditorModule({ config: runtime, dom, api: apiClient, helpers: util, modal }) {

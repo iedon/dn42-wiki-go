@@ -21,6 +21,7 @@ var reservedRouteNames = map[string]struct{}{
 	"root":         {},
 	"default":      {},
 	"theme":        {},
+	"api":          {},
 }
 
 var (
@@ -30,12 +31,13 @@ var (
 	ErrReservedPath = errors.New("reserved path")
 )
 
-func normalizeRelPath(input string) (string, error) {
+func normalizeRelPath(input, homeDoc string) (string, error) {
+	home := ensureHomeDoc(homeDoc)
 	candidate := strings.TrimSpace(input)
 	candidate = strings.ReplaceAll(candidate, "\\", "/")
 	candidate = strings.Trim(candidate, "/")
 	if candidate == "" {
-		candidate = "Home"
+		candidate = home
 	}
 	if strings.Contains(candidate, "\x00") {
 		return "", errors.Join(ErrInvalidPath, errors.New("contains null byte"))
@@ -50,7 +52,7 @@ func normalizeRelPath(input string) (string, error) {
 	}
 	cleaned = strings.TrimPrefix(cleaned, "/")
 	if cleaned == "" {
-		cleaned = "Home.md"
+		cleaned = home
 	}
 	if strings.HasPrefix(cleaned, "..") || strings.Contains(cleaned, "/../") {
 		return "", errors.Join(ErrInvalidPath, errors.New("path escapes repository root"))
@@ -70,6 +72,26 @@ func normalizeRelPath(input string) (string, error) {
 	}
 
 	return filepath.ToSlash(cleaned), nil
+}
+
+func ensureHomeDoc(homeDoc string) string {
+	trimmed := strings.TrimSpace(homeDoc)
+	trimmed = strings.ReplaceAll(trimmed, "\\", "/")
+	if trimmed == "" {
+		trimmed = "Home.md"
+	}
+	if !strings.HasSuffix(strings.ToLower(trimmed), ".md") {
+		trimmed += ".md"
+	}
+	cleaned := path.Clean(trimmed)
+	for strings.HasPrefix(cleaned, "./") {
+		cleaned = strings.TrimPrefix(cleaned, "./")
+	}
+	cleaned = strings.TrimPrefix(cleaned, "/")
+	if cleaned == "" {
+		cleaned = "Home.md"
+	}
+	return filepath.ToSlash(cleaned)
 }
 
 func isReservedPath(rel string) bool {

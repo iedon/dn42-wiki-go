@@ -88,7 +88,7 @@ func (s *Service) BuildStatic(ctx context.Context) error {
 	if err := s.writeDocuments(docs); err != nil {
 		return err
 	}
-	if err := s.writeDirectoryPage(); err != nil {
+	if err := s.writeDirectoryPage(ctx); err != nil {
 		return err
 	}
 
@@ -135,6 +135,11 @@ func (s *Service) Pull(ctx context.Context) error {
 		return err
 	}
 	return s.Warm(ctx)
+}
+
+// Push synchronizes local commits to the configured remote.
+func (s *Service) Push(ctx context.Context) error {
+	return s.repo.Push(ctx)
 }
 
 // RepositoryDir returns the path of the checked-out wiki repository.

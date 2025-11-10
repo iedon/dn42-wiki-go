@@ -7,14 +7,17 @@
     "remote": "https://git.dn42.dev/wiki/wiki",
     "localDirectory": "./wiki",
     "pullIntervalSec": 300,
+    "pushIntervalSec": 0,
     "author": "Anonymous <anonymous@localhost>",
     "commitMessagePrefix": "[wiki] ",
     "commitMessageAppendRemoteAddr": " (via %s)"
   },
   "webHook": true,
   "webHookListen": ":8081",
+  "webHookAuthPreShared": "",
   "outputDir": "./dist",
   "templateDir": "./template",
+  "homeDoc": "Home.md",
   "baseUrl": "",
   "ignoreHeader": true,
   "ignoreFooter": false,
@@ -23,9 +26,6 @@
   "tlsCert": "./server.crt",
   "tlsKey": "./server.key",
   "logLevel": "info",
-  "trustedProxies": [
-    "127.0.0.1",
-    "::1/128"
-  ],
+  "trustedProxies": ["127.0.0.1", "::1/128"],
   "trustedRemoteAddrLevel": 1
 }

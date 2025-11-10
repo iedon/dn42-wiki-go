@@ -11,9 +11,10 @@ import (
 )
 
 const (
-	DefaultContentTemplate  = "content-default"
-	NotFoundContentTemplate = "content-404"
-	LayoutTemplate          = "layout"
+	DefaultContentTemplate   = "content-default"
+	NotFoundContentTemplate  = "content-404"
+	DirectoryContentTemplate = "content-directory"
+	LayoutTemplate           = "layout"
 )
 
 // Engine is a thin wrapper around Go templates with a fallback default layout.
@@ -46,6 +47,7 @@ type PageData struct {
 	LastUpdated      string
 	LastCommitHash   string
 	LastCommitShort  string
+	Directory        []*DirectoryEntry
 }
 
 // TOCEntry models a single heading for sidebar navigation.
@@ -68,6 +70,19 @@ type Breadcrumb struct {
 	Title   string
 	Path    string
 	Current bool
+}
+
+// DirectoryEntry represents a node in the directory listing hierarchy.
+type DirectoryEntry struct {
+	Title    string
+	URL      string
+	Route    string
+	Children []*DirectoryEntry
+	Count    int
+	Depth    int
+	ID       string
+	Anchor   string
+	Aliases  []string
 }
 
 // Load instantiates an engine using files from templateDir.

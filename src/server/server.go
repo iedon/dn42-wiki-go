@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -118,9 +119,13 @@ func (s *Server) runWebhook(ctx context.Context) {
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/webhook", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
+	mux.HandleFunc("/webhook/pull", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
 			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		if !s.authorizeWebhook(r) {
+			writeError(w, http.StatusUnauthorized, "unauthorized")
 			return
 		}
 		if err := s.svc.Pull(r.Context()); err != nil {
@@ -129,6 +134,22 @@ func (s *Server) runWebhook(ctx context.Context) {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "synced"})
+	})
+	mux.HandleFunc("/webhook/push", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		if !s.authorizeWebhook(r) {
+			writeError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		if err := s.svc.Push(r.Context()); err != nil {
+			s.logger.Error("webhook push", "error", err)
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "pushed"})
 	})
 
 	srv := &http.Server{Handler: s.logRequests(mux)}
@@ -140,6 +161,30 @@ func (s *Server) runWebhook(ctx context.Context) {
 	if err := srv.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		s.logger.Error("webhook server stopped", "error", err)
 	}
+}
+
+func (s *Server) authorizeWebhook(r *http.Request) bool {
+	secret := s.cfg.WebhookAuthPreShared
+	if secret == "" {
+		return true
+	}
+
+	header := strings.TrimSpace(r.Header.Get("Authorization"))
+	const prefix = "Bearer "
+	if header == "" || !strings.HasPrefix(header, prefix) {
+		return false
+	}
+
+	token := strings.TrimSpace(header[len(prefix):])
+	if token == "" {
+		return false
+	}
+
+	if subtle.ConstantTimeCompare([]byte(token), []byte(secret)) != 1 {
+		return false
+	}
+
+	return true
 }
 
 func (s *Server) tryStatic(w http.ResponseWriter, r *http.Request) bool {

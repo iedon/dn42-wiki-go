@@ -1,4 +1,62 @@
-@import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@400;700&family=Spline+Sans+Mono&display=swap');
+@font-face {
+    font-family: 'Titillium Web';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('fonts/TitilliumWeb-Regular-latin-ext.woff2') format('woff2'),
+         url('fonts/TitilliumWeb-Regular.ttf') format('truetype');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: 'Titillium Web';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('fonts/TitilliumWeb-Regular-latin.woff2') format('woff2'),
+         url('fonts/TitilliumWeb-Regular.ttf') format('truetype');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'Titillium Web';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('fonts/TitilliumWeb-Bold-latin-ext.woff2') format('woff2'),
+         url('fonts/TitilliumWeb-Bold.ttf') format('truetype');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: 'Titillium Web';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('fonts/TitilliumWeb-Bold-latin.woff2') format('woff2'),
+         url('fonts/TitilliumWeb-Bold.ttf') format('truetype');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'Spline Sans Mono';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('fonts/SplineSansMono-Regular-latin-ext.woff2') format('woff2'),
+         url('fonts/SplineSansMono-Regular.ttf') format('truetype');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+    font-family: 'Spline Sans Mono';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('fonts/SplineSansMono-Regular-latin.woff2') format('woff2'),
+         url('fonts/SplineSansMono-Regular.ttf') format('truetype');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
 
 html,
 body {
@@ -1081,4 +1139,170 @@ body.light .back-to-top {
     opacity: 1;
     transform: translateY(0);
     pointer-events: auto;
+}
+
+.directory {
+    display: block;
+}
+
+.directory h1 {
+    margin: 0 0 0.75rem;
+}
+
+.directory-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.directory-list--root {
+    margin-top: 0.75rem;
+}
+
+@media (min-width: 960px) {
+    .directory-list--root {
+        column-count: 2;
+        column-gap: 2.5rem;
+    }
+}
+
+.directory-item {
+    display: block;
+    margin: 0.3rem 0;
+    break-inside: avoid;
+    scroll-margin-top: 96px;
+}
+
+.directory-item--page > a,
+.directory-branch > summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: inherit;
+    text-decoration: none;
+}
+
+.directory-item--page > a {
+    font-weight: 400;
+}
+
+.directory-item--page > a:hover,
+.directory-item--page > a:focus-visible {
+    text-decoration: underline;
+}
+
+.directory-item--page > a::before {
+    content: "";
+    display: inline-block;
+    width: 1.1rem;
+    height: 1.25rem;
+    background-color: currentColor;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8%201.5h7l5%205V20a2%202%200%200%201-2%202H8a2%202%200%200%201-2-2V3.5a2%202%200%200%201%202-2Z'/%3E%3Crect x='9.2' y='10.2' width='8.6' height='1.8' rx='0.9'/%3E%3Crect x='9.2' y='14' width='9.8' height='1.8' rx='0.9'/%3E%3Crect x='9.2' y='17.8' width='6.8' height='1.8' rx='0.9'/%3E%3C/svg%3E") no-repeat center / contain;
+    opacity: 0.85;
+}
+
+.directory-branch {
+    display: block;
+}
+
+.directory-branch > summary {
+    cursor: pointer;
+    padding: 0.15rem 0;
+    list-style: none;
+    font-weight: 600;
+}
+
+.directory-branch > summary::-webkit-details-marker {
+    display: none;
+}
+
+.directory-branch > summary::before {
+    content: "▶";
+    font-size: 0.7rem;
+    color: currentColor;
+    opacity: 0.6;
+    transition: transform 0.15s ease;
+}
+
+.directory-branch[open] > summary::before {
+    transform: rotate(90deg);
+}
+
+.directory-label {
+    flex: 1;
+}
+
+.directory-count {
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    background: rgba(255, 255, 255, 0.14);
+    color: var(--link-hover);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 999px;
+    padding: 0.12rem 0.55rem;
+}
+
+body.light .directory-count {
+    background: rgba(0, 0, 0, 0.12);
+    color: var(--link-color);
+    border-color: rgba(0, 0, 0, 0.18);
+}
+
+.directory-list ul {
+    list-style: none;
+    margin: 0.25rem 0 0.35rem 0.8rem;
+    padding-left: 0.75rem;
+    border-left: 1px solid var(--borders);
+}
+
+.directory-list ul > li {
+    position: relative;
+    padding-left: 0.8rem;
+    margin: 0.25rem 0;
+}
+
+.directory-list ul > li::before {
+    content: "";
+    position: absolute;
+    top: 0.85em;
+    left: -0.8rem;
+    width: 0.75rem;
+    border-top: 1px solid var(--borders);
+    opacity: 0.6;
+}
+
+.directory-branch > summary:focus-visible {
+    outline: 2px solid var(--link-color);
+    outline-offset: 2px;
+}
+
+.directory-branch > summary:hover {
+    color: var(--link-hover);
+}
+
+.directory-item--group .directory-count {
+    margin-left: auto;
+}
+
+.directory-item--active > a,
+.directory-item--active > .directory-branch > summary {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--link-hover);
+    border-radius: 6px;
+    padding: 0.18rem 0.55rem;
+}
+
+body.light .directory-item--active > a,
+body.light .directory-item--active > .directory-branch > summary {
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.directory-item--active > .directory-branch > summary::before {
+    opacity: 0.85;
+}
+
+.directory-item:target > a,
+.directory-item:target > .directory-branch > summary {
+    box-shadow: inset 0 0 0 1px var(--link-hover);
+    border-radius: 6px;
 }

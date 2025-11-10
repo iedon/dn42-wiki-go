@@ -2,13 +2,13 @@ package config
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/netip"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -20,9 +20,11 @@ type GitConfig struct {
 	Remote                        string `json:"remote"`
 	LocalDirectory                string `json:"localDirectory"`
 	PullIntervalSec               int    `json:"pullIntervalSec"`
+	PushIntervalSec               int    `json:"pushIntervalSec"`
 	Author                        string `json:"author"`
 	CommitMessagePrefix           string `json:"commitMessagePrefix"`
 	CommitMessageAppendRemoteAddr string `json:"commitMessageAppendRemoteAddr"`
+	pushIntervalDefined           bool   `json:"-"`
 }
 
 // Config encapsulates runtime and build-time options.
@@ -33,8 +35,10 @@ type Config struct {
 	Git                    GitConfig      `json:"git"`
 	WebhookEnabled         bool           `json:"webHook"`
 	WebhookListen          string         `json:"webHookListen"`
+	WebhookAuthPreShared   string         `json:"webHookAuthPreShared"`
 	OutputDir              string         `json:"outputDir"`
 	TemplateDir            string         `json:"templateDir"`
+	HomeDoc                string         `json:"homeDoc"`
 	BaseURL                string         `json:"baseUrl"`
 	IgnoreHeader           bool           `json:"ignoreHeader"`
 	IgnoreFooter           bool           `json:"ignoreFooter"`
@@ -46,7 +50,41 @@ type Config struct {
 	TrustedProxies         []string       `json:"trustedProxies"`
 	TrustedRemoteAddrLevel int            `json:"trustedRemoteAddrLevel"`
 	PullInterval           time.Duration  `json:"-"`
+	PushInterval           time.Duration  `json:"-"`
 	trustedProxyPrefixes   []netip.Prefix `json:"-"`
+}
+
+func (g *GitConfig) UnmarshalJSON(data []byte) error {
+	type rawGitConfig struct {
+		BinPath                       string `json:"binPath"`
+		Remote                        string `json:"remote"`
+		LocalDirectory                string `json:"localDirectory"`
+		PullIntervalSec               int    `json:"pullIntervalSec"`
+		PushIntervalSec               *int   `json:"pushIntervalSec"`
+		Author                        string `json:"author"`
+		CommitMessagePrefix           string `json:"commitMessagePrefix"`
+		CommitMessageAppendRemoteAddr string `json:"commitMessageAppendRemoteAddr"`
+	}
+
+	var raw rawGitConfig
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	g.BinPath = raw.BinPath
+	g.Remote = raw.Remote
+	g.LocalDirectory = raw.LocalDirectory
+	g.PullIntervalSec = raw.PullIntervalSec
+	g.Author = raw.Author
+	g.CommitMessagePrefix = raw.CommitMessagePrefix
+	g.CommitMessageAppendRemoteAddr = raw.CommitMessageAppendRemoteAddr
+	g.pushIntervalDefined = raw.PushIntervalSec != nil
+	if raw.PushIntervalSec != nil {
+		g.PushIntervalSec = *raw.PushIntervalSec
+	} else {
+		g.PushIntervalSec = 0
+	}
+	return nil
 }
 
 // Load reads configuration from disk and applies sane defaults.
@@ -90,6 +128,8 @@ func (c *Config) applyDefaults() error {
 	if c.TemplateDir == "" {
 		c.TemplateDir = "./template"
 	}
+	c.WebhookAuthPreShared = strings.TrimSpace(c.WebhookAuthPreShared)
+	c.HomeDoc = normalizeHomeDoc(c.HomeDoc)
 	c.Git.BinPath = strings.TrimSpace(c.Git.BinPath)
 	c.Git.Remote = strings.TrimSpace(c.Git.Remote)
 	c.Git.LocalDirectory = strings.TrimSpace(c.Git.LocalDirectory)
@@ -102,6 +142,12 @@ func (c *Config) applyDefaults() error {
 	}
 	if c.Git.PullIntervalSec <= 0 {
 		c.Git.PullIntervalSec = 300
+	}
+	if !c.Git.pushIntervalDefined {
+		c.Git.PushIntervalSec = 0
+	}
+	if c.Git.PushIntervalSec < 0 {
+		c.Git.PushIntervalSec = 0
 	}
 	if c.LogLevel == "" {
 		c.LogLevel = "info"
@@ -120,15 +166,26 @@ func (c *Config) applyDefaults() error {
 	}
 
 	c.PullInterval = time.Duration(c.Git.PullIntervalSec) * time.Second
+	if c.Git.Remote == "" {
+		c.PullInterval = 0
+	}
+	if c.Git.PushIntervalSec > 0 {
+		c.PushInterval = time.Duration(c.Git.PushIntervalSec) * time.Second
+	} else {
+		c.PushInterval = 0
+	}
+	if c.Git.Remote == "" {
+		c.PushInterval = 0
+	}
 	return nil
 }
 
 func (c *Config) validate() error {
-	if strings.TrimSpace(c.Git.Remote) == "" {
-		return errors.New("git.remote is required")
-	}
 	if c.PullInterval < 0 {
 		return fmt.Errorf("negative pull interval")
+	}
+	if c.PushInterval < 0 {
+		return fmt.Errorf("negative push interval")
 	}
 	if c.EnableTLS {
 		if c.TLSCert == "" || c.TLSKey == "" {
@@ -166,6 +223,26 @@ func (c *Config) compileTrustedProxies() error {
 		c.trustedProxyPrefixes = append(c.trustedProxyPrefixes, prefix)
 	}
 	return nil
+}
+
+func normalizeHomeDoc(input string) string {
+	trimmed := strings.TrimSpace(input)
+	trimmed = strings.ReplaceAll(trimmed, "\\", "/")
+	if trimmed == "" {
+		trimmed = "Home.md"
+	}
+	if !strings.HasSuffix(strings.ToLower(trimmed), ".md") {
+		trimmed += ".md"
+	}
+	cleaned := path.Clean(trimmed)
+	for strings.HasPrefix(cleaned, "./") {
+		cleaned = strings.TrimPrefix(cleaned, "./")
+	}
+	cleaned = strings.TrimPrefix(cleaned, "/")
+	if cleaned == "" {
+		cleaned = "Home.md"
+	}
+	return filepath.ToSlash(cleaned)
 }
 
 // IsTrustedProxy reports whether the provided address is within the trusted proxy list.

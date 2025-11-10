@@ -45,6 +45,10 @@ func NewRepository(gitPath, remote, dir string) (*Repository, error) {
 
 // Pull updates the repository with remote changes.
 func (r *Repository) Pull(ctx context.Context) error {
+	if strings.TrimSpace(r.Remote) == "" {
+		return nil
+	}
+
 	ctx, cancel := ensureContext(ctx)
 	defer cancel()
 
@@ -194,6 +198,26 @@ func (r *Repository) Rename(ctx context.Context, oldPath, newPath string) error 
 	return nil
 }
 
+// Push propagates local commits to the remote.
+func (r *Repository) Push(ctx context.Context) error {
+	if strings.TrimSpace(r.Remote) == "" {
+		return nil
+	}
+
+	ctx, cancel := ensureContext(ctx)
+	defer cancel()
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	cmd := r.command(ctx, "push")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		outStr := string(out)
+		return fmt.Errorf("git push: %w (%s)", err, outStr)
+	}
+	return nil
+}
+
 // CommitChanges stages and commits files with provided message.
 func (r *Repository) CommitChanges(ctx context.Context, paths []string, message string, author string) error {
 	if strings.TrimSpace(message) == "" {
@@ -206,8 +230,14 @@ func (r *Repository) CommitChanges(ctx context.Context, paths []string, message 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	stageArgs := []string{"add", "--all"}
-	stageArgs = append(stageArgs, normalizePaths(paths)...)
+	sanitized := normalizePaths(paths)
+	stageArgs := []string{"add"}
+	if len(sanitized) == 0 {
+		stageArgs = append(stageArgs, "--all")
+	} else {
+		stageArgs = append(stageArgs, "--")
+		stageArgs = append(stageArgs, sanitized...)
+	}
 	cmd := r.command(ctx, stageArgs...)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git add: %w (%s)", err, string(out))
@@ -219,7 +249,26 @@ func (r *Repository) CommitChanges(ctx context.Context, paths []string, message 
 	}
 	cmd = r.command(ctx, commitArgs...)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("git commit: %w (%s)", err, string(out))
+		outStr := string(out)
+		if strings.Contains(outStr, "nothing added to commit") {
+			if err := r.stageAll(ctx); err != nil {
+				return fmt.Errorf("git commit: %w", err)
+			}
+			cmd = r.command(ctx, commitArgs...)
+			if retryOut, retryErr := cmd.CombinedOutput(); retryErr != nil {
+				return fmt.Errorf("git commit: %w (%s)", retryErr, string(retryOut))
+			}
+			return nil
+		}
+		return fmt.Errorf("git commit: %w (%s)", err, outStr)
+	}
+	return nil
+}
+
+func (r *Repository) stageAll(ctx context.Context) error {
+	cmd := r.command(ctx, "add", "--all")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git add: %w (%s)", err, string(out))
 	}
 	return nil
 }
@@ -253,10 +302,22 @@ func (r *Repository) ensureClone() error {
 	if err := os.MkdirAll(r.Dir, 0o755); err != nil {
 		return err
 	}
+
+	if strings.TrimSpace(r.Remote) == "" {
+		ctx, cancel := context.WithTimeout(context.Background(), CommandTimeout)
+		defer cancel()
+
+		cmd := exec.CommandContext(ctx, r.GitPath, "init")
+		cmd.Dir = r.Dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("git init: %w (%s)", err, string(out))
+		}
+		return nil
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), CommandTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, r.GitPath, "clone", "--depth", "1", r.Remote, r.Dir)
+	cmd := exec.CommandContext(ctx, r.GitPath, "clone", r.Remote, r.Dir)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git clone: %w (%s)", err, string(out))
 	}

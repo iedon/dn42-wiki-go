@@ -8,6 +8,10 @@ if [ -d ./dist ]; then
 fi
 mkdir -p ./dist
 
+cd ./src
+go mod tidy
+go get
+cd ..
 go build -C ./src -o ../dist/dn42-wiki-go
 if [ $? -ne 0 ]; then
     echo "Build failed"

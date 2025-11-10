@@ -16,7 +16,7 @@
     {{ end }}
 
     <div class="content">
-        {{ if and .Breadcrumbs (ne .ContentTemplate "content-404") }}
+        {{ if and .Breadcrumbs (ne .ContentTemplate "content-404") (ne .ContentTemplate "content-directory") }}
         <p class="path" aria-label="Breadcrumb">
             {{ range $index, $crumb := .Breadcrumbs }}
                 {{ if $crumb.Path }}
@@ -30,6 +30,8 @@
         {{ end }}
         {{ if eq .ContentTemplate "content-404" }}
             {{ template "content-404" . }}
+        {{ else if eq .ContentTemplate "content-directory" }}
+            {{ template "content-directory" . }}
         {{ else }}
             {{ template "content-default" . }}
         {{ end }}

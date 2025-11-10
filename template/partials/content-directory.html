@@ -1,0 +1,33 @@
+{{ define "content-directory" }}
+<section class="directory">
+    <h1>{{ .Title }}</h1>
+    {{ if .Directory }}
+    <ul class="directory-list directory-list--root">
+        {{ template "directory-list" .Directory }}
+    </ul>
+    {{ else }}
+    <p>No documents found.</p>
+    {{ end }}
+</section>
+{{ end }}
+
+{{ define "directory-list" }}
+{{ range . }}
+<li class="directory-item{{ if .Children }} directory-item--group{{ else }} directory-item--page{{ end }}" data-depth="{{ .Depth }}"{{ if .ID }} id="{{ .ID }}"{{ end }}{{ if .Anchor }} data-directory-anchor="{{ .Anchor }}"{{ end }}{{ if .Aliases }} data-directory-aliases="{{ range $index, $alias := .Aliases }}{{ if $index }} {{ end }}{{ $alias }}{{ end }}"{{ end }}>
+    {{ if .Children }}
+    {{ $isOpen := le .Depth 1 }}
+    <details class="directory-branch" {{ if $isOpen }}open{{ end }}{{ if .Anchor }} data-directory-anchor="{{ .Anchor }}"{{ end }}>
+        <summary>
+            <span class="directory-label">{{ .Title }}</span>
+            {{ if gt .Count 0 }}<span class="directory-count" aria-label="{{ .Count }} pages">{{ .Count }}</span>{{ end }}
+        </summary>
+        <ul class="directory-list">
+            {{ template "directory-list" .Children }}
+        </ul>
+    </details>
+    {{ else }}
+    <a href="{{ .URL }}">{{ .Title }}</a>
+    {{ end }}
+</li>
+{{ end }}
+{{ end }}

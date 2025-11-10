@@ -15,7 +15,7 @@ func (s *Service) SavePage(ctx context.Context, relPath string, content []byte, 
 		return fmt.Errorf("editing disabled")
 	}
 
-	rel, err := normalizeRelPath(relPath)
+	rel, err := normalizeRelPath(relPath, s.cfg.HomeDoc)
 	if err != nil {
 		return err
 	}
@@ -49,11 +49,11 @@ func (s *Service) RenamePage(ctx context.Context, oldPath, newPath, remoteAddr s
 		return fmt.Errorf("new path required")
 	}
 
-	oldRel, err := normalizeRelPath(oldPath)
+	oldRel, err := normalizeRelPath(oldPath, s.cfg.HomeDoc)
 	if err != nil {
 		return err
 	}
-	newRel, err := normalizeRelPath(newPath)
+	newRel, err := normalizeRelPath(newPath, s.cfg.HomeDoc)
 	if err != nil {
 		return err
 	}
@@ -67,12 +67,18 @@ func (s *Service) RenamePage(ctx context.Context, oldPath, newPath, remoteAddr s
 		return err
 	}
 
+	homeDoc := ensureHomeDoc(s.cfg.HomeDoc)
+	homeDisplay := strings.TrimSuffix(filepath.ToSlash(homeDoc), filepath.Ext(homeDoc))
+	if homeDisplay == "" {
+		homeDisplay = "Home"
+	}
+
 	format := func(rel string) string {
 		cleaned := filepath.ToSlash(rel)
 		cleaned = strings.TrimSuffix(cleaned, filepath.Ext(cleaned))
 		cleaned = strings.TrimPrefix(cleaned, "/")
 		if cleaned == "" {
-			return "Home"
+			return homeDisplay
 		}
 		return cleaned
 	}
@@ -90,7 +96,7 @@ func (s *Service) RenamePage(ctx context.Context, oldPath, newPath, remoteAddr s
 
 // History returns commit metadata for the provided path.
 func (s *Service) History(ctx context.Context, relPath string, page, pageSize int) ([]gitutil.Commit, bool, error) {
-	rel, err := normalizeRelPath(relPath)
+	rel, err := normalizeRelPath(relPath, s.cfg.HomeDoc)
 	if err != nil {
 		return nil, false, err
 	}
@@ -99,7 +105,7 @@ func (s *Service) History(ctx context.Context, relPath string, page, pageSize in
 
 // Diff renders a diff between two commits for the provided path.
 func (s *Service) Diff(ctx context.Context, relPath, from, to string) (string, error) {
-	rel, err := normalizeRelPath(relPath)
+	rel, err := normalizeRelPath(relPath, s.cfg.HomeDoc)
 	if err != nil {
 		return "", err
 	}
@@ -108,7 +114,7 @@ func (s *Service) Diff(ctx context.Context, relPath, from, to string) (string, e
 
 // LoadRaw returns the underlying markdown content for editing purposes.
 func (s *Service) LoadRaw(relPath string) ([]byte, error) {
-	rel, err := normalizeRelPath(relPath)
+	rel, err := normalizeRelPath(relPath, s.cfg.HomeDoc)
 	if err != nil {
 		return nil, err
 	}
