@@ -20,7 +20,7 @@ var reservedRouteNames = map[string]struct{}{
 	"gollum":       {},
 	"root":         {},
 	"default":      {},
-	"theme":        {},
+	"assets":       {},
 	"api":          {},
 }
 

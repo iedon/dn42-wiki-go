@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/iedon/dn42-wiki-go/config"
 	"github.com/iedon/dn42-wiki-go/fsutil"
@@ -26,6 +28,51 @@ type Service struct {
 	search    *SearchCatalog
 }
 
+// buildLayout constructs the common layout fragments.
+func (s *Service) buildLayout(ctx context.Context) error {
+	_ = ctx
+	var headerHTML, footerHTML, sidebarHTML, serverFooterHTML template.HTML
+
+	if !s.cfg.IgnoreHeader {
+		if fragment, err := s.documents.RenderFragment("_Header.md"); err != nil {
+			if !os.IsNotExist(err) {
+				return err
+			}
+		} else {
+			headerHTML = template.HTML(fragment.HTML)
+		}
+	}
+
+	if !s.cfg.IgnoreFooter {
+		if fragment, err := s.documents.RenderFragment("_Footer.md"); err != nil {
+			if !os.IsNotExist(err) {
+				return err
+			}
+		} else {
+			footerHTML = template.HTML(fragment.HTML)
+		}
+	}
+
+	if fragment, err := s.documents.RenderFragment("_Sidebar.md"); err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+	} else {
+		sidebarHTML = template.HTML(fragment.HTML)
+	}
+
+	if trimmed := strings.TrimSpace(s.cfg.ServerFooter); trimmed != "" {
+		rendered, err := s.renderer.Render([]byte(trimmed))
+		if err != nil {
+			return err
+		}
+		serverFooterHTML = template.HTML(rendered.HTML)
+	}
+
+	s.layout.Update(headerHTML, footerHTML, serverFooterHTML, sidebarHTML)
+	return nil
+}
+
 // NewService constructs a Service instance.
 func NewService(cfg *config.Config, repo *gitutil.Repository, templates *templatex.Engine) *Service {
 	rend := renderer.New()
@@ -38,14 +85,6 @@ func NewService(cfg *config.Config, repo *gitutil.Repository, templates *templat
 		layout:    newLayoutCache(),
 		search:    newSearchCatalog(),
 	}
-}
-
-// Warm loads layout fragments and rebuilds the in-memory search data.
-func (s *Service) Warm(ctx context.Context) error {
-	if err := s.refreshLayout(ctx); err != nil {
-		return err
-	}
-	return s.rebuildSearchIndex(ctx)
 }
 
 // BuildStatic renders the entire repository into static HTML assets.
@@ -67,7 +106,7 @@ func (s *Service) BuildStatic(ctx context.Context) error {
 		}
 	}()
 
-	if err := s.refreshLayout(ctx); err != nil {
+	if err := s.buildLayout(ctx); err != nil {
 		return err
 	}
 
@@ -115,9 +154,9 @@ func (s *Service) BuildStatic(ctx context.Context) error {
 	s.search.Update(indexJSON)
 
 	if s.templates.StaticDir != "" {
-		dst := filepath.Join(tempDir, "theme")
+		dst := filepath.Join(tempDir, "assets")
 		if err := fsutil.CopyTree(s.templates.StaticDir, dst); err != nil {
-			return fmt.Errorf("copy theme assets: %w", err)
+			return fmt.Errorf("copy assets: %w", err)
 		}
 	}
 
@@ -158,6 +197,10 @@ func (s *Service) RenderPreview(content []byte) (*renderer.RenderResult, error) 
 func (s *Service) SearchIndex() json.RawMessage {
 	payload := s.search.Snapshot()
 	if len(payload) == 0 {
+		path := filepath.Join(s.cfg.OutputDir, "search-index.json")
+		if data, err := os.ReadFile(path); err == nil && len(data) > 0 {
+			return append(json.RawMessage(nil), data...)
+		}
 		return append(json.RawMessage(nil), emptySearchIndexJSON...)
 	}
 	return payload
@@ -167,9 +210,6 @@ func (s *Service) SearchIndex() json.RawMessage {
 func (s *Service) Pull(ctx context.Context) error {
 	changed, err := s.repo.Pull(ctx)
 	if err != nil {
-		return err
-	}
-	if err := s.Warm(ctx); err != nil {
 		return err
 	}
 	if !changed {
@@ -191,7 +231,7 @@ func (s *Service) RepositoryDir() string {
 	return s.documents.RepoDir()
 }
 
-// ThemeDir returns the directory containing template assets, if any.
-func (s *Service) ThemeDir() string {
+// AssetsDir returns the directory containing template assets, if any.
+func (s *Service) AssetsDir() string {
 	return s.templates.StaticDir
 }

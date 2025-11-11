@@ -18,7 +18,7 @@ import (
 
 // RenderPage renders a single document for live mode.
 func (s *Service) RenderPage(ctx context.Context, relPath string) (*templatex.PageData, error) {
-	if err := s.refreshLayout(ctx); err != nil {
+	if err := s.buildLayout(ctx); err != nil {
 		return nil, err
 	}
 
@@ -53,7 +53,7 @@ func (s *Service) RenderFullPage(ctx context.Context, relPath string) ([]byte, e
 
 // RenderNotFoundPage renders a themed 404 page.
 func (s *Service) RenderNotFoundPage(ctx context.Context, requestedPath string) ([]byte, error) {
-	if err := s.refreshLayout(ctx); err != nil {
+	if err := s.buildLayout(ctx); err != nil {
 		return nil, err
 	}
 
@@ -77,7 +77,7 @@ func (s *Service) RenderNotFoundPage(ctx context.Context, requestedPath string) 
 	if sanitized != "" && sanitized != "/" {
 		description = fmt.Sprintf("The requested path %s could not be found.", sanitized)
 	}
-	data.Meta = s.buildMeta("", description, description, "website")
+	data.Meta = s.buildMeta(description, description, "website")
 
 	var buf bytes.Buffer
 	if err := s.templates.Render(&buf, data); err != nil {
@@ -146,7 +146,6 @@ func (s *Service) pageData(doc page) *templatex.PageData {
 		Sections:         doc.Sections,
 		ActivePath:       doc.Route,
 		RequestedPath:    doc.Route,
-		SearchEnabled:    true,
 		Editable:         s.cfg.Editable,
 		Buttons: templatex.PageButtons{
 			EnableHistory: s.cfg.Editable,
@@ -163,7 +162,7 @@ func (s *Service) pageData(doc page) *templatex.PageData {
 		LastCommitHash:  doc.LastHash,
 		LastCommitShort: lastCommitShort,
 	}
-	data.Meta = s.buildMeta(doc.Route, doc.Summary, doc.Title, "article")
+	data.Meta = s.buildMeta(doc.Summary, doc.Title, "article")
 	return data
 }
 
@@ -185,7 +184,6 @@ func (s *Service) directoryPageData(ctx context.Context) (*templatex.PageData, e
 		ContentTemplate:  templatex.DirectoryContentTemplate,
 		ActivePath:       directoryPageRoute,
 		RequestedPath:    directoryPageRoute,
-		SearchEnabled:    true,
 		Editable:         false,
 		Buttons:          templatex.PageButtons{},
 		SearchIndexURL:   path.Join("/", s.cfg.BaseURL, "search-index.json"),
@@ -196,7 +194,7 @@ func (s *Service) directoryPageData(ctx context.Context) (*templatex.PageData, e
 		},
 		Directory: entries,
 	}
-	data.Meta = s.buildMeta(directoryPageRoute, "Browse the complete documentation index.", directoryPageTitle, "website")
+	data.Meta = s.buildMeta("Browse the complete documentation index.", directoryPageTitle, "website")
 	return data, nil
 }
 
@@ -283,7 +281,7 @@ func (s *Service) writeHomeAliases(baseDir string, docs []page) error {
 	return nil
 }
 
-func (s *Service) buildMeta(route, summary, fallback, ogType string) templatex.Meta {
+func (s *Service) buildMeta(summary, fallback, ogType string) templatex.Meta {
 	if ogType == "" {
 		ogType = "website"
 	}

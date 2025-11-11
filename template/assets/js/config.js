@@ -3,7 +3,6 @@ export function createConfig(root) {
   const basePath = normalizeBase(dataset.base ?? "");
   return {
     basePath,
-    searchEnabled: dataset.searchEnabled === "true",
     editable: dataset.editable === "true",
     pagePath: dataset.path ?? "",
     repoUrl: dataset.repo ?? "",

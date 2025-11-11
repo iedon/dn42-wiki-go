@@ -1,7 +1,7 @@
 {{ define "layout" }}<!DOCTYPE html>
 <html lang="en">
     {{ template "head" . }}
-<body data-path="{{ .ActivePath }}" data-editable="{{ .Editable }}" data-live="{{ .Live }}" data-base="{{ .BaseURL }}" data-search-enabled="{{ .SearchEnabled }}" data-search-index="{{ .SearchIndexURL }}">
+<body data-path="{{ .ActivePath }}" data-editable="{{ .Editable }}" data-live="{{ .Live }}" data-base="{{ .BaseURL }}" data-search-index="{{ .SearchIndexURL }}">
     {{ template "scripts" . }}
     {{ template "header" . }}
     {{ template "utility" . }}

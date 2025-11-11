@@ -37,7 +37,10 @@ func (s *Service) SavePage(ctx context.Context, relPath string, content []byte, 
 	if err := s.documents.Commit(ctx, []string{rel}, finalMessage, finalAuthor); err != nil {
 		return err
 	}
-	return s.Warm(ctx)
+	if err := s.BuildStatic(ctx); err != nil {
+		return fmt.Errorf("build static: %w", err)
+	}
+	return nil
 }
 
 // RenamePage moves a document and commits the rename.
@@ -91,7 +94,10 @@ func (s *Service) RenamePage(ctx context.Context, oldPath, newPath, remoteAddr s
 	if err := s.documents.Commit(ctx, []string{newRel}, finalMessage, s.composeCommitAuthor("")); err != nil {
 		return err
 	}
-	return s.Warm(ctx)
+	if err := s.BuildStatic(ctx); err != nil {
+		return fmt.Errorf("build static: %w", err)
+	}
+	return nil
 }
 
 // History returns commit metadata for the provided path.

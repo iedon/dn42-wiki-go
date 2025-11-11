@@ -11,7 +11,7 @@ const RESERVED_PATHS = new Set([
   "gollum",
   "root",
   "default",
-  "theme",
+  "assets",
   "api",
 ]);
 

@@ -194,7 +194,7 @@ export function createHistoryModule({ config: runtime, dom, api: apiClient, help
     if (state.selected.length !== 2 || !historyDiffModal || !historyDiff) {
       return;
     }
-    const [from, to] = state.selected.slice().sort((a, b) => a.index - b.index);
+    const [from, to] = state.selected.slice().sort((a, b) => b.index - a.index);
     setHistoryDiffTitle(from.hash, to.hash);
     modal.open(historyDiffModal, { stack: true, trigger: historyViewDiff });
     showDiffStatus("Loading diff...", "z-go");

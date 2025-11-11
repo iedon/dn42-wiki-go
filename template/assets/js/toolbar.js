@@ -1,8 +1,5 @@
 export function createToolbarModule({ dom, config: runtime, editor, history }) {
   function init() {
-    if (!runtime.editable) {
-      return;
-    }
     dom.qsa("[data-action]").forEach((button) => {
       button.addEventListener("click", (event) => {
         event.preventDefault();
@@ -19,6 +16,9 @@ export function createToolbarModule({ dom, config: runtime, editor, history }) {
             break;
           case "history":
             history.open(button);
+            break;
+          case "home":
+            window.location.href = runtime.basePath || "/";
             break;
           default:
             break;

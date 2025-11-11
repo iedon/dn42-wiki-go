@@ -15,10 +15,6 @@ import (
 
 var safeRevisionPattern = regexp.MustCompile(`^[0-9A-Fa-f]{4,64}$`)
 
-func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
-}
-
 func (s *Server) handleHistory(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -201,33 +197,79 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 	if s.tryStatic(w, r) {
 		return
 	}
-
-	path := strings.TrimPrefix(r.URL.Path, "/")
-	if path == "" {
-		path = s.cfg.HomeDoc
-	}
-
-	html, err := s.svc.RenderFullPage(r.Context(), path)
-	if err != nil {
-		switch {
-		case errors.Is(err, site.ErrInvalidPath), errors.Is(err, os.ErrNotExist):
-			notFound, renderErr := s.svc.RenderNotFoundPage(r.Context(), r.URL.Path)
-			if renderErr != nil {
-				writeError(w, http.StatusInternalServerError, renderErr.Error())
-				return
-			}
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			w.WriteHeader(http.StatusNotFound)
-			_, _ = w.Write(notFound)
-		default:
-			writeError(w, http.StatusInternalServerError, err.Error())
-		}
+	if s.redirectHTML(w, r) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(html)
+	staticPath, err := s.svc.StaticDocumentPath(r.URL.Path)
+	if err != nil {
+		s.serveNotFound(w, r)
+		return
+	}
+	if !isWithin(s.cfg.OutputDir, staticPath) {
+		s.serveNotFound(w, r)
+		return
+	}
+	info, err := os.Stat(staticPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			s.serveNotFound(w, r)
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if info.IsDir() {
+		s.serveNotFound(w, r)
+		return
+	}
+	http.ServeFile(w, r, staticPath)
+}
+
+func (s *Server) serveNotFound(w http.ResponseWriter, r *http.Request) {
+	if page, err := s.svc.RenderNotFoundPage(r.Context(), r.URL.Path); err == nil {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write(page)
+		return
+	}
+
+	path := s.svc.NotFoundDocumentPath()
+	if isWithin(s.cfg.OutputDir, path) {
+		if data, err := os.ReadFile(path); err == nil {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write(data)
+			return
+		}
+	}
+	writeError(w, http.StatusNotFound, "not found")
+}
+
+func (s *Server) redirectHTML(w http.ResponseWriter, r *http.Request) bool {
+	clean := sanitizeRequestPath(r.URL.Path)
+	lower := strings.ToLower(clean)
+	if strings.HasSuffix(lower, ".html") {
+		target := clean[:len(clean)-len(".html")]
+		switch target {
+		case "", "/", "/index":
+			target = "/"
+		}
+		if raw := r.URL.RawQuery; raw != "" {
+			target += "?" + raw
+		}
+		http.Redirect(w, r, target, http.StatusMovedPermanently)
+		return true
+	}
+	if clean == "/index" {
+		target := "/"
+		if raw := r.URL.RawQuery; raw != "" {
+			target += "?" + raw
+		}
+		http.Redirect(w, r, target, http.StatusMovedPermanently)
+		return true
+	}
+	return false
 }
 
 func isSafeRevision(ref string) bool {

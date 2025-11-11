@@ -562,7 +562,7 @@ export function createSearchModule({
   }
 
   function init() {
-    if (!runtime.searchEnabled || !input || !results) {
+    if (!input || !results) {
       return;
     }
     registerResultHandlers();

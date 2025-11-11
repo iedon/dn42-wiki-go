@@ -39,10 +39,9 @@ func New(cfg *config.Config, svc *site.Service, logger *slog.Logger) *Server {
 }
 
 // Start launches the HTTP server and optional webhook listener.
+
 func (s *Server) Start(ctx context.Context) error {
-	if err := s.svc.Warm(ctx); err != nil {
-		return fmt.Errorf("warm service: %w", err)
-	}
+	// Build static pages on startup
 	if err := s.svc.BuildStatic(ctx); err != nil {
 		s.logger.Warn("static build", "error", err)
 	}
@@ -94,7 +93,6 @@ func (s *Server) Start(ctx context.Context) error {
 }
 
 func (s *Server) routes() {
-	s.mux.HandleFunc("/healthz", s.handleHealth)
 	s.mux.HandleFunc("/api/history", s.handleHistory)
 	s.mux.HandleFunc("/api/diff", s.handleDiff)
 	s.mux.HandleFunc("/api/document", s.handleDocument)
@@ -241,36 +239,24 @@ func (s *Server) authorizeWebhook(r *http.Request) bool {
 }
 
 func (s *Server) tryStatic(w http.ResponseWriter, r *http.Request) bool {
-	ext := filepath.Ext(r.URL.Path)
+	clean := sanitizeRequestPath(r.URL.Path)
+	if clean == "/" {
+		return false
+	}
+	ext := strings.ToLower(filepath.Ext(clean))
 	if ext == "" || ext == ".html" {
 		return false
 	}
-
-	clean := path.Clean(r.URL.Path)
-	if !strings.HasPrefix(clean, "/") {
-		clean = "/" + clean
-	}
-	candidate := filepath.Join(s.svc.RepositoryDir(), filepath.FromSlash(clean[1:]))
-	if !isWithin(s.svc.RepositoryDir(), candidate) {
+	target := filepath.Join(s.cfg.OutputDir, filepath.FromSlash(strings.TrimPrefix(clean, "/")))
+	if !isWithin(s.cfg.OutputDir, target) {
 		return false
 	}
-	if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
-		http.ServeFile(w, r, candidate)
-		return true
+	info, err := os.Stat(target)
+	if err != nil || info.IsDir() {
+		return false
 	}
-
-	if theme := s.svc.ThemeDir(); theme != "" && strings.HasPrefix(clean, "/theme/") {
-		rel := strings.TrimPrefix(clean, "/theme/")
-		themePath := filepath.Join(theme, filepath.FromSlash(rel))
-		if !isWithin(theme, themePath) {
-			return false
-		}
-		if info, err := os.Stat(themePath); err == nil && !info.IsDir() {
-			http.ServeFile(w, r, themePath)
-			return true
-		}
-	}
-	return false
+	http.ServeFile(w, r, target)
+	return true
 }
 
 func isWithin(base, target string) bool {
@@ -291,6 +277,20 @@ func isWithin(base, target string) bool {
 		return false
 	}
 	return true
+}
+
+func sanitizeRequestPath(p string) string {
+	if p == "" {
+		return "/"
+	}
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+	clean := path.Clean(p)
+	if clean == "." {
+		return "/"
+	}
+	return clean
 }
 
 type responseWriter struct {

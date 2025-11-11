@@ -51,6 +51,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// not live mode, live=false or run with --build flag
 	if !cfg.Live {
 		if err := svc.BuildStatic(ctx); err != nil {
 			logger.Error("build", "error", err)

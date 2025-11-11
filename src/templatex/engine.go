@@ -36,7 +36,6 @@ type PageData struct {
 	Sections         []TOCEntry
 	ActivePath       string
 	RequestedPath    string
-	SearchEnabled    bool
 	Editable         bool
 	Buttons          PageButtons
 	SearchIndexURL   string
