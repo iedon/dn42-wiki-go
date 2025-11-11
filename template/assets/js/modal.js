@@ -3,12 +3,29 @@ export function createModalManager(domUtils) {
   const stack = [];
   const triggers = new WeakMap();
 
+  function dispatchLifecycle(modal, phase) {
+    if (!modal) {
+      return;
+    }
+    try {
+      modal.dispatchEvent(
+        new CustomEvent(`modal:${phase}`, {
+          bubbles: true,
+          detail: { modal },
+        })
+      );
+    } catch (_error) {
+      /* no-op */
+    }
+  }
+
   function hideModal(modal) {
     domUtils.hide(modal);
   }
 
   function showModal(modal) {
     domUtils.show(modal);
+    dispatchLifecycle(modal, "open");
     focusFirstControl(modal);
   }
 
@@ -66,6 +83,7 @@ export function createModalManager(domUtils) {
       stack.splice(index, 1);
     }
     hideModal(modal);
+    dispatchLifecycle(modal, "close");
     restoreFocus(modal);
     deactivateBackdrop();
   }

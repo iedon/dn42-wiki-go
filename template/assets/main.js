@@ -11,6 +11,7 @@ import { createSearchModule } from "./js/search.js";
 import { createHistoryModule } from "./js/history.js";
 import { createEditorModule } from "./js/editor.js";
 import { createToolbarModule } from "./js/toolbar.js";
+import { createSidebarModule } from "./js/sidebar.js";
 
 const body = document.body;
 if (!body) {
@@ -31,6 +32,7 @@ const search = createSearchModule({ config, dom, api, helpers });
 const history = createHistoryModule({ config, dom, api, helpers, modal });
 const editor = createEditorModule({ config, dom, api, helpers, modal });
 const toolbar = createToolbarModule({ dom, config, editor, history });
+const sidebarOverlay = createSidebarModule({ dom, modal });
 
 modal.init();
 externalLinks.init();
@@ -41,3 +43,4 @@ search.init();
 history.init();
 editor.init();
 toolbar.init();
+sidebarOverlay.init();
