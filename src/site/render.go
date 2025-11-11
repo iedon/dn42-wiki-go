@@ -220,6 +220,12 @@ func (s *Service) writeDocuments(baseDir string, docs []page) error {
 		if err := os.WriteFile(target, minified, 0o644); err != nil {
 			return err
 		}
+		if !doc.LastMod.IsZero() {
+			stamp := doc.LastMod.UTC()
+			if err := os.Chtimes(target, stamp, stamp); err != nil {
+				return fmt.Errorf("set mod time %s: %w", doc.Route, err)
+			}
+		}
 	}
 	return nil
 }
@@ -264,6 +270,12 @@ func (s *Service) writeHomeAliases(baseDir string, docs []page) error {
 			target := filepath.Join(baseDir, filepath.FromSlash(doc.OutputPath))
 			if err := fsutil.CopyFile(target, alias); err != nil {
 				return fmt.Errorf("create home alias: %w", err)
+			}
+			if !doc.LastMod.IsZero() {
+				stamp := doc.LastMod.UTC()
+				if err := os.Chtimes(alias, stamp, stamp); err != nil {
+					return fmt.Errorf("alias mod time: %w", err)
+				}
 			}
 			break
 		}

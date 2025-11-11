@@ -44,9 +44,9 @@ func NewRepository(gitPath, remote, dir string) (*Repository, error) {
 }
 
 // Pull updates the repository with remote changes.
-func (r *Repository) Pull(ctx context.Context) error {
+func (r *Repository) Pull(ctx context.Context) (bool, error) {
 	if strings.TrimSpace(r.Remote) == "" {
-		return nil
+		return false, nil
 	}
 
 	ctx, cancel := ensureContext(ctx)
@@ -55,21 +55,34 @@ func (r *Repository) Pull(ctx context.Context) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	prev, prevErr := r.headHash(ctx)
+
 	cmd := r.command(ctx, "pull", "--ff-only")
+	if prevErr != nil {
+		return false, prevErr
+	}
 	if out, err := cmd.CombinedOutput(); err != nil {
 		outStr := string(out)
 		if bytes.Contains(out, []byte("You have not concluded your merge")) {
-			return fmt.Errorf("pull aborted: %s", out)
+			return false, fmt.Errorf("pull aborted: %s", out)
 		}
 		if needsRebaseFallback(outStr) {
 			if err := r.pullWithRebase(ctx); err != nil {
-				return err
+				return false, err
 			}
-			return nil
+			after, afterErr := r.headHash(ctx)
+			if afterErr != nil {
+				return false, afterErr
+			}
+			return after != prev, nil
 		}
-		return fmt.Errorf("git pull: %w (%s)", err, outStr)
+		return false, fmt.Errorf("git pull: %w (%s)", err, outStr)
 	}
-	return nil
+	after, afterErr := r.headHash(ctx)
+	if afterErr != nil {
+		return false, afterErr
+	}
+	return after != prev, nil
 }
 
 func (r *Repository) pullWithRebase(ctx context.Context) error {
@@ -79,6 +92,19 @@ func (r *Repository) pullWithRebase(ctx context.Context) error {
 		return fmt.Errorf("git pull --rebase: %w (%s)", err, string(out))
 	}
 	return nil
+}
+
+func (r *Repository) headHash(ctx context.Context) (string, error) {
+	cmd := r.command(ctx, "rev-parse", "HEAD")
+	out, err := cmd.Output()
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return "", nil
+		}
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 func needsRebaseFallback(output string) bool {
@@ -97,7 +123,8 @@ func needsRebaseFallback(output string) bool {
 
 // PullPath triggers git fetch specifically for a file path to warm caches.
 func (r *Repository) PullPath(ctx context.Context, path string) error {
-	return r.Pull(ctx)
+	_, err := r.Pull(ctx)
+	return err
 }
 
 // Log returns paginated commit history scoped to a file path.

@@ -165,11 +165,15 @@ func (s *Service) SearchIndex() json.RawMessage {
 
 // Pull synchronizes the repository and refreshes caches.
 func (s *Service) Pull(ctx context.Context) error {
-	if err := s.repo.Pull(ctx); err != nil {
+	changed, err := s.repo.Pull(ctx)
+	if err != nil {
 		return err
 	}
 	if err := s.Warm(ctx); err != nil {
 		return err
+	}
+	if !changed {
+		return nil
 	}
 	if err := s.BuildStatic(ctx); err != nil {
 		return fmt.Errorf("build static: %w", err)
