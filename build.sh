@@ -12,7 +12,7 @@ cd ./src
 go mod tidy
 go get
 cd ..
-go build -C ./src -o ../dist/dn42-wiki-go
+go build -C ./src -o ../dist/dn42-wiki-go -ldflags="-X main.GIT_COMMIT=$(git rev-parse --short HEAD)"
 if [ $? -ne 0 ]; then
     echo "Build failed"
     exit 1

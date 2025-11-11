@@ -26,14 +26,15 @@ type Server struct {
 	logger              *slog.Logger
 	mux                 *http.ServeMux
 	trustForwardHeaders bool
+	serverHeader        string
 }
 
 // New constructs a server instance.
-func New(cfg *config.Config, svc *site.Service, logger *slog.Logger) *Server {
+func New(cfg *config.Config, svc *site.Service, logger *slog.Logger, serverHeader string) *Server {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	}
-	srv := &Server{cfg: cfg, svc: svc, logger: logger, mux: http.NewServeMux(), trustForwardHeaders: true}
+	srv := &Server{cfg: cfg, svc: svc, logger: logger, mux: http.NewServeMux(), trustForwardHeaders: true, serverHeader: strings.TrimSpace(serverHeader)}
 	srv.routes()
 	return srv
 }
@@ -59,7 +60,7 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	server := &http.Server{
-		Handler:      s.logRequests(s.mux),
+		Handler:      s.withServerHeader(s.logRequests(s.mux)),
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  120 * time.Second,
@@ -153,6 +154,16 @@ func (s *Server) systemdListener() (net.Listener, bool, error) {
 	return listener, true, nil
 }
 
+func (s *Server) withServerHeader(next http.Handler) http.Handler {
+	if s.serverHeader == "" {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Server", s.serverHeader)
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (s *Server) logRequests(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -203,7 +214,7 @@ func (s *Server) runWebhook(ctx context.Context) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "pushed"})
 	})
 
-	srv := &http.Server{Handler: s.logRequests(mux)}
+	srv := &http.Server{Handler: s.withServerHeader(s.logRequests(mux))}
 	go func() {
 		<-ctx.Done()
 		_ = srv.Shutdown(context.Background())

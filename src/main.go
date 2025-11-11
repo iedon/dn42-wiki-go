@@ -66,7 +66,7 @@ func main() {
 		go pushLoop(ctx, svc, cfg.PushInterval, logger)
 	}
 
-	srv := server.New(cfg, svc, logger)
+	srv := server.New(cfg, svc, logger, SERVER_HEADER)
 	if err := srv.Start(ctx); err != nil {
 		logger.Error("server", "error", err)
 		os.Exit(1)
