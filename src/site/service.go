@@ -18,72 +18,208 @@ import (
 
 // Service orchestrates document rendering, indexing, and persistence.
 type Service struct {
-	cfg       *config.Config
-	repo      *gitutil.Repository
-	templates *templatex.Engine
-	renderer  *renderer.Renderer
+	cfg         *config.Config
+	repo        *gitutil.Repository
+	templates   *templatex.Engine
+	renderer    *renderer.Renderer
+	homeDoc     string
+	basePrefix  string
+	baseRoot    string
+	baseTrimmed string
 
 	documents *DocumentStore
 	layout    *LayoutCache
 	search    *SearchCatalog
 }
+type requestAnalysis struct {
+	original      string
+	clean         string
+	relative      string
+	candidate     string
+	hadHTML       bool
+	trailingSlash bool
+}
 
 // buildLayout constructs the common layout fragments.
 func (s *Service) buildLayout(ctx context.Context) error {
 	_ = ctx
-	var headerHTML, footerHTML, sidebarHTML, serverFooterHTML template.HTML
+
+	var (
+		headerHTML, footerHTML, serverFooterHTML, sidebarHTML template.HTML
+		err                                                   error
+	)
 
 	if !s.cfg.IgnoreHeader {
-		if fragment, err := s.documents.RenderFragment("_Header.md"); err != nil {
-			if !os.IsNotExist(err) {
-				return err
-			}
-		} else {
-			headerHTML = template.HTML(fragment.HTML)
+		headerHTML, err = s.optionalFragment("_Header.md")
+		if err != nil {
+			return err
 		}
 	}
 
 	if !s.cfg.IgnoreFooter {
-		if fragment, err := s.documents.RenderFragment("_Footer.md"); err != nil {
-			if !os.IsNotExist(err) {
-				return err
-			}
-		} else {
-			footerHTML = template.HTML(fragment.HTML)
-		}
-	}
-
-	if fragment, err := s.documents.RenderFragment("_Sidebar.md"); err != nil {
-		if !os.IsNotExist(err) {
-			return err
-		}
-	} else {
-		sidebarHTML = template.HTML(fragment.HTML)
-	}
-	if trimmed := strings.TrimSpace(s.cfg.ServerFooter); trimmed != "" {
-		rendered, err := s.renderer.Render([]byte(trimmed))
+		footerHTML, err = s.optionalFragment("_Footer.md")
 		if err != nil {
 			return err
 		}
-		serverFooterHTML = template.HTML(rendered.HTML)
+	}
+
+	sidebarHTML, err = s.optionalFragment("_Sidebar.md")
+	if err != nil {
+		return err
+	}
+
+	serverFooterHTML, err = s.renderInlineMarkdown(strings.TrimSpace(s.cfg.ServerFooter))
+	if err != nil {
+		return err
 	}
 
 	s.layout.Update(headerHTML, footerHTML, serverFooterHTML, sidebarHTML)
 	return nil
 }
 
+func (s *Service) optionalFragment(name string) (template.HTML, error) {
+	fragment, err := s.documents.RenderFragment(name)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	return template.HTML(fragment.HTML), nil
+}
+
+func (s *Service) renderInlineMarkdown(content string) (template.HTML, error) {
+	if strings.TrimSpace(content) == "" {
+		return "", nil
+	}
+	rendered, err := s.renderer.Render([]byte(content))
+	if err != nil {
+		return "", err
+	}
+	return template.HTML(rendered.HTML), nil
+}
+
 // NewService constructs a Service instance.
 func NewService(cfg *config.Config, repo *gitutil.Repository, templates *templatex.Engine) *Service {
 	rend := renderer.New()
-	return &Service{
-		cfg:       cfg,
-		repo:      repo,
-		templates: templates,
-		renderer:  rend,
-		documents: newDocumentStore(repo, rend),
-		layout:    newLayoutCache(),
-		search:    newSearchCatalog(),
+	homeDoc := ensureHomeDoc(cfg.HomeDoc)
+	trimmedBase := strings.Trim(strings.TrimSpace(cfg.BaseURL), "/")
+	basePrefix := ""
+	baseRoot := "/"
+	if trimmedBase != "" {
+		basePrefix = "/" + trimmedBase
+		baseRoot = basePrefix + "/"
 	}
+	return &Service{
+		cfg:         cfg,
+		repo:        repo,
+		templates:   templates,
+		renderer:    rend,
+		homeDoc:     homeDoc,
+		basePrefix:  basePrefix,
+		baseRoot:    baseRoot,
+		baseTrimmed: trimmedBase,
+		documents:   newDocumentStore(repo, rend, homeDoc),
+		layout:      newLayoutCache(),
+		search:      newSearchCatalog(),
+	}
+}
+
+func (s *Service) analyzeRequestPath(requestPath string) (requestAnalysis, bool) {
+	original := requestPath
+	if strings.TrimSpace(original) == "" {
+		original = "/"
+	}
+	clean := sanitizeRoute(original)
+	rel, ok := s.trimBase(clean)
+	if !ok {
+		return requestAnalysis{}, false
+	}
+	candidate := strings.TrimPrefix(rel, "/")
+	candidate = strings.TrimSuffix(candidate, "/")
+	hadHTML := false
+	if lowered := strings.ToLower(candidate); strings.HasSuffix(lowered, ".html") {
+		candidate = candidate[:len(candidate)-len(".html")]
+		hadHTML = true
+	}
+	analysis := requestAnalysis{
+		original:      original,
+		clean:         clean,
+		relative:      rel,
+		candidate:     candidate,
+		hadHTML:       hadHTML,
+		trailingSlash: strings.HasSuffix(original, "/"),
+	}
+	return analysis, true
+}
+
+func (s *Service) trimBase(clean string) (string, bool) {
+	if s.baseTrimmed == "" {
+		if clean == "" {
+			return "/", true
+		}
+		return clean, true
+	}
+	if clean == s.basePrefix {
+		return "/", true
+	}
+	if strings.HasPrefix(clean, s.basePrefix+"/") {
+		remainder := clean[len(s.basePrefix):]
+		if remainder == "" {
+			return "/", true
+		}
+		return remainder, true
+	}
+	return "", false
+}
+
+func (s *Service) pathWithBase(route string) string {
+	if route == "/" {
+		if s.baseTrimmed == "" {
+			return "/"
+		}
+		return s.baseRoot
+	}
+	if s.baseTrimmed == "" {
+		return route
+	}
+	return s.basePrefix + route
+}
+
+// CanonicalRedirect resolves the canonical path for a request, indicating redirect needs and alias semantics.
+func (s *Service) CanonicalRedirect(requestPath string) (string, bool, bool, error) {
+	info, ok := s.analyzeRequestPath(requestPath)
+	if !ok {
+		return "", false, false, nil
+	}
+
+	if info.relative == directoryPageRoute {
+		canonical := s.pathWithBase(directoryPageRoute)
+		return canonical, false, info.original != canonical, nil
+	}
+
+	if strings.EqualFold(info.relative, "/index") {
+		canonical := s.pathWithBase("/")
+		return canonical, false, info.original != canonical, nil
+	}
+
+	if info.hadHTML {
+		target := strings.TrimSuffix(info.relative, ".html")
+		switch strings.ToLower(target) {
+		case "", "/", "/index":
+			canonical := s.pathWithBase("/")
+			return canonical, false, info.original != canonical, nil
+		}
+	}
+
+	rel, err := normalizeRelPath(info.candidate, s.homeDoc)
+	if err != nil {
+		return "", false, false, err
+	}
+	route := routeFromPath(rel, s.homeDoc)
+	canonical := s.pathWithBase(route)
+	alias := route == "/" && info.candidate != ""
+	return canonical, alias, info.original != canonical, nil
 }
 
 // BuildStatic renders the entire repository into static HTML assets.

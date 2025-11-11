@@ -77,6 +77,7 @@ func normalizeRelPath(input, homeDoc string) (string, error) {
 	return filepath.ToSlash(cleaned), nil
 }
 
+// ensureHomeDoc normalizes the home document path.
 func ensureHomeDoc(homeDoc string) string {
 	trimmed := strings.TrimSpace(homeDoc)
 	trimmed = strings.ReplaceAll(trimmed, "\\", "/")
@@ -97,6 +98,7 @@ func ensureHomeDoc(homeDoc string) string {
 	return filepath.ToSlash(cleaned)
 }
 
+// isReservedPath checks if the given relative path maps to a reserved route.
 func isReservedPath(rel string) bool {
 	lowered := strings.ToLower(filepath.ToSlash(strings.TrimSpace(rel)))
 	lowered = strings.TrimPrefix(lowered, "/")
@@ -108,6 +110,7 @@ func isReservedPath(rel string) bool {
 	return ok
 }
 
+// isDirectoryRoute checks if the given relative path maps to the directory page route.
 func isDirectoryRoute(rel string) bool {
 	lowered := strings.ToLower(filepath.ToSlash(strings.TrimSpace(rel)))
 	lowered = strings.TrimPrefix(lowered, "/")
@@ -130,17 +133,36 @@ func isIgnorable(path string) bool {
 	return strings.HasPrefix(base, ".git")
 }
 
-func routeFromPath(relPath string) string {
-	slash := filepath.ToSlash(relPath)
-	slash = strings.TrimSuffix(slash, filepath.Ext(slash))
-	if !strings.HasPrefix(slash, "/") {
-		slash = "/" + slash
+func routeFromPath(relPath, homeDoc string) string {
+	normalized := filepath.ToSlash(strings.TrimSpace(relPath))
+	home := filepath.ToSlash(strings.TrimSpace(homeDoc))
+	if home == "" {
+		home = "Home.md"
 	}
-	return slash
+	if strings.EqualFold(normalized, home) {
+		return "/"
+	}
+	base := strings.TrimSuffix(normalized, filepath.Ext(normalized))
+	base = strings.Trim(base, "/")
+	if base == "" {
+		return "/"
+	}
+	return "/" + base + "/"
 }
 
-func htmlPathFrom(relPath string) string {
-	rel := filepath.ToSlash(relPath)
-	rel = strings.TrimSuffix(rel, filepath.Ext(rel)) + ".html"
-	return rel
+func htmlPathFrom(relPath, homeDoc string) string {
+	normalized := filepath.ToSlash(strings.TrimSpace(relPath))
+	home := filepath.ToSlash(strings.TrimSpace(homeDoc))
+	if home == "" {
+		home = "Home.md"
+	}
+	if strings.EqualFold(normalized, home) {
+		return "index.html"
+	}
+	base := strings.TrimSuffix(normalized, filepath.Ext(normalized))
+	base = strings.Trim(base, "/")
+	if base == "" {
+		return "index.html"
+	}
+	return path.Join(base, "index.html")
 }

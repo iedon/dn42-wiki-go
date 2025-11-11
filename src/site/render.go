@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"html/template"
 	"os"
 	"path"
 	"path/filepath"
@@ -22,7 +21,7 @@ func (s *Service) RenderPage(ctx context.Context, relPath string) (*templatex.Pa
 		return nil, err
 	}
 
-	norm, err := normalizeRelPath(relPath, s.cfg.HomeDoc)
+	norm, err := normalizeRelPath(relPath, s.homeDoc)
 	if err != nil {
 		return nil, err
 	}
@@ -56,37 +55,24 @@ func (s *Service) RenderFullPage(ctx context.Context, relPath string) ([]byte, e
 
 // RenderNotFoundPage renders a themed 404 page.
 func (s *Service) RenderNotFoundPage(ctx context.Context, requestedPath string) ([]byte, error) {
-	if err := s.buildLayout(ctx); err != nil {
-		return nil, err
+	cfg := statusPageConfig{
+		title:       "404 - Not found",
+		template:    templatex.NotFoundContentTemplate,
+		metaType:    "website",
+		description: notFoundDescription,
 	}
+	return s.renderStatusPage(ctx, requestedPath, cfg)
+}
 
-	doc := page{
-		Title: "404 - Not found",
-		Route: "",
-		HTML:  template.HTML(""),
+// RenderForbiddenPage renders a themed 403 page for restricted routes.
+func (s *Service) RenderForbiddenPage(ctx context.Context, requestedPath string) ([]byte, error) {
+	cfg := statusPageConfig{
+		title:       "403 - Forbidden",
+		template:    templatex.ForbiddenContentTemplate,
+		metaType:    "website",
+		description: forbiddenDescription,
 	}
-
-	data := s.pageData(doc)
-	data.Editable = false
-	data.Buttons = templatex.PageButtons{}
-	data.ContentTemplate = templatex.NotFoundContentTemplate
-	data.ActivePath = ""
-	sanitized := strings.TrimSpace(requestedPath)
-	if sanitized != "" {
-		sanitized = sanitizeRequestedPath(sanitized)
-	}
-	data.RequestedPath = sanitized
-	description := "The page you are looking for could not be found."
-	if sanitized != "" && sanitized != "/" {
-		description = fmt.Sprintf("The requested path %s could not be found.", sanitized)
-	}
-	data.Meta = s.buildMeta(description, description, "website")
-
-	var buf bytes.Buffer
-	if err := s.templates.Render(&buf, data); err != nil {
-		return nil, err
-	}
-	return s.renderer.MinifyHTML(buf.Bytes())
+	return s.renderStatusPage(ctx, requestedPath, cfg)
 }
 
 func sanitizeRequestedPath(raw string) string {
@@ -102,39 +88,58 @@ func sanitizeRequestedPath(raw string) string {
 	return cleaned
 }
 
-// RenderForbiddenPage renders a themed 403 page for restricted routes.
-func (s *Service) RenderForbiddenPage(ctx context.Context, requestedPath string) ([]byte, error) {
+// statusPageConfig drives rendering for themed status pages.
+type statusPageConfig struct {
+	title       string
+	template    string
+	metaType    string
+	description func(string) string
+}
+
+// renderStatusPage centralizes 403/404 page generation to keep the templates in sync.
+func (s *Service) renderStatusPage(ctx context.Context, requestedPath string, cfg statusPageConfig) ([]byte, error) {
 	if err := s.buildLayout(ctx); err != nil {
 		return nil, err
 	}
 
-	doc := page{
-		Title: "403 - Forbidden",
-		Route: "",
-		HTML:  template.HTML(""),
-	}
-
-	data := s.pageData(doc)
-	data.Editable = false
-	data.Buttons = templatex.PageButtons{}
-	data.ContentTemplate = templatex.ForbiddenContentTemplate
-	data.ActivePath = ""
 	sanitized := strings.TrimSpace(requestedPath)
 	if sanitized != "" {
 		sanitized = sanitizeRequestedPath(sanitized)
 	}
+
+	doc := page{Title: cfg.title}
+	data := s.pageData(doc)
+	data.Editable = false
+	data.Buttons = templatex.PageButtons{}
+	data.ContentTemplate = cfg.template
+	data.ActivePath = ""
 	data.RequestedPath = sanitized
-	description := "Access to the requested resource is restricted."
-	if sanitized != "" && sanitized != "/" {
-		description = fmt.Sprintf("Access to %s is restricted.", sanitized)
+
+	description := ""
+	if cfg.description != nil {
+		description = cfg.description(sanitized)
 	}
-	data.Meta = s.buildMeta(description, doc.Title, "website")
+	data.Meta = s.buildMeta(description, cfg.title, cfg.metaType)
 
 	var buf bytes.Buffer
 	if err := s.templates.Render(&buf, data); err != nil {
 		return nil, err
 	}
 	return s.renderer.MinifyHTML(buf.Bytes())
+}
+
+func notFoundDescription(path string) string {
+	if path != "" && path != "/" {
+		return fmt.Sprintf("The requested path %s could not be found.", path)
+	}
+	return "The page you are looking for could not be found."
+}
+
+func forbiddenDescription(path string) string {
+	if path != "" && path != "/" {
+		return fmt.Sprintf("Access to %s is restricted.", path)
+	}
+	return "Access to the requested resource is restricted."
 }
 
 func (s *Service) renderDocuments(ctx context.Context, files []string) ([]page, error) {
@@ -287,24 +292,19 @@ func (s *Service) writeDirectoryPage(ctx context.Context, baseDir string) error 
 }
 
 func (s *Service) writeNotFoundPage(ctx context.Context, baseDir string) error {
-	// Pre-render a themed 404 page so static hosting setups can serve it directly.
-	pageBytes, err := s.RenderNotFoundPage(ctx, "")
-	if err != nil {
-		return err
-	}
-	output := filepath.Join(baseDir, "404.html")
-	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(output, pageBytes, 0o644)
+	return s.writeStatusPage(ctx, baseDir, "404.html", s.RenderNotFoundPage)
 }
 
 func (s *Service) writeForbiddenPage(ctx context.Context, baseDir string) error {
-	pageBytes, err := s.RenderForbiddenPage(ctx, "")
+	return s.writeStatusPage(ctx, baseDir, "403.html", s.RenderForbiddenPage)
+}
+
+func (s *Service) writeStatusPage(ctx context.Context, baseDir, filename string, render func(context.Context, string) ([]byte, error)) error {
+	pageBytes, err := render(ctx, "")
 	if err != nil {
 		return err
 	}
-	output := filepath.Join(baseDir, "403.html")
+	output := filepath.Join(baseDir, filename)
 	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil {
 		return err
 	}
@@ -313,9 +313,12 @@ func (s *Service) writeForbiddenPage(ctx context.Context, baseDir string) error 
 
 func (s *Service) writeHomeAliases(baseDir string, docs []page) error {
 	for _, doc := range docs {
-		if strings.EqualFold(doc.Source, ensureHomeDoc(s.cfg.HomeDoc)) {
+		if strings.EqualFold(doc.Source, s.homeDoc) {
 			alias := filepath.Join(baseDir, "index.html")
 			target := filepath.Join(baseDir, filepath.FromSlash(doc.OutputPath))
+			if filepath.Clean(alias) == filepath.Clean(target) {
+				return nil
+			}
 			if err := fsutil.CopyFile(target, alias); err != nil {
 				return fmt.Errorf("create home alias: %w", err)
 			}
@@ -349,7 +352,7 @@ func (s *Service) buildMeta(summary, fallback, ogType string) templatex.Meta {
 func (s *Service) siteName() string {
 	name := strings.TrimSpace(s.cfg.SiteName)
 	if name == "" {
-		name = deriveTitle(ensureHomeDoc(s.cfg.HomeDoc))
+		name = deriveTitle(s.homeDoc)
 	}
 	name = strings.TrimSpace(name)
 	if name == "" || strings.EqualFold(name, "Untitled") {

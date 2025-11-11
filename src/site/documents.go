@@ -18,10 +18,11 @@ import (
 type DocumentStore struct {
 	repo     *gitutil.Repository
 	renderer *renderer.Renderer
+	homeDoc  string
 }
 
-func newDocumentStore(repo *gitutil.Repository, renderer *renderer.Renderer) *DocumentStore {
-	return &DocumentStore{repo: repo, renderer: renderer}
+func newDocumentStore(repo *gitutil.Repository, renderer *renderer.Renderer, homeDoc string) *DocumentStore {
+	return &DocumentStore{repo: repo, renderer: renderer, homeDoc: ensureHomeDoc(homeDoc)}
 }
 
 func (d *DocumentStore) ListTracked(ctx context.Context) ([]string, error) {
@@ -62,8 +63,8 @@ func (d *DocumentStore) RenderDocument(ctx context.Context, relPath string) (pag
 
 	doc := page{
 		Source:     relPath,
-		Route:      routeFromPath(relPath),
-		OutputPath: htmlPathFrom(relPath),
+		Route:      routeFromPath(relPath, d.homeDoc),
+		OutputPath: htmlPathFrom(relPath, d.homeDoc),
 		Title:      title,
 		HTML:       template.HTML(rendered.HTML),
 		Sections:   sections,

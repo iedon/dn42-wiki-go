@@ -1,9 +1,7 @@
 package site
 
-import "strings"
-
 func (s *Service) routeIsPrivateFromRel(rel string) bool {
-	route := routeFromPath(rel)
+	route := routeFromPath(rel, s.homeDoc)
 	return s.routeIsPrivate(route)
 }
 
@@ -22,27 +20,21 @@ func (s *Service) ensureRouteAccessible(rel string) error {
 }
 
 func (s *Service) routeFromRequestPath(requestPath string) (string, error) {
-	route := sanitizeRoute(requestPath)
-	if route == directoryPageRoute {
+	info, ok := s.analyzeRequestPath(requestPath)
+	if !ok {
+		return "", ErrInvalidPath
+	}
+	if info.relative == directoryPageRoute {
 		return directoryPageRoute, nil
 	}
-	if route == "/" {
-		home := ensureHomeDoc(s.cfg.HomeDoc)
-		return routeFromPath(home), nil
+	if info.relative == "/" {
+		return "/", nil
 	}
-
-	trimmed := strings.TrimPrefix(route, "/")
-	trimmed = strings.TrimSuffix(trimmed, "/")
-	lower := strings.ToLower(trimmed)
-	if strings.HasSuffix(lower, ".html") {
-		trimmed = trimmed[:len(trimmed)-len(".html")]
-	}
-
-	rel, err := normalizeRelPath(trimmed, s.cfg.HomeDoc)
+	rel, err := normalizeRelPath(info.candidate, s.homeDoc)
 	if err != nil {
 		return "", err
 	}
-	return routeFromPath(rel), nil
+	return routeFromPath(rel, s.homeDoc), nil
 }
 
 // EnsureRequestAccessible validates whether the provided HTTP route is accessible in live mode.

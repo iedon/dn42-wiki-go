@@ -15,7 +15,7 @@ func (s *Service) SavePage(ctx context.Context, relPath string, content []byte, 
 		return fmt.Errorf("editing disabled")
 	}
 
-	rel, err := normalizeRelPath(relPath, s.cfg.HomeDoc)
+	rel, err := normalizeRelPath(relPath, s.homeDoc)
 	if err != nil {
 		return err
 	}
@@ -55,11 +55,11 @@ func (s *Service) RenamePage(ctx context.Context, oldPath, newPath, remoteAddr s
 		return fmt.Errorf("new path required")
 	}
 
-	oldRel, err := normalizeRelPath(oldPath, s.cfg.HomeDoc)
+	oldRel, err := normalizeRelPath(oldPath, s.homeDoc)
 	if err != nil {
 		return err
 	}
-	newRel, err := normalizeRelPath(newPath, s.cfg.HomeDoc)
+	newRel, err := normalizeRelPath(newPath, s.homeDoc)
 	if err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func (s *Service) RenamePage(ctx context.Context, oldPath, newPath, remoteAddr s
 		return err
 	}
 
-	homeDoc := ensureHomeDoc(s.cfg.HomeDoc)
+	homeDoc := s.homeDoc
 	homeDisplay := strings.TrimSuffix(filepath.ToSlash(homeDoc), filepath.Ext(homeDoc))
 	if homeDisplay == "" {
 		homeDisplay = "Home"
@@ -111,7 +111,7 @@ func (s *Service) RenamePage(ctx context.Context, oldPath, newPath, remoteAddr s
 
 // History returns commit metadata for the provided path.
 func (s *Service) History(ctx context.Context, relPath string, page, pageSize int) ([]gitutil.Commit, bool, error) {
-	rel, err := normalizeRelPath(relPath, s.cfg.HomeDoc)
+	rel, err := normalizeRelPath(relPath, s.homeDoc)
 	if err != nil {
 		return nil, false, err
 	}
@@ -123,7 +123,7 @@ func (s *Service) History(ctx context.Context, relPath string, page, pageSize in
 
 // Diff renders a diff between two commits for the provided path.
 func (s *Service) Diff(ctx context.Context, relPath, from, to string) (string, error) {
-	rel, err := normalizeRelPath(relPath, s.cfg.HomeDoc)
+	rel, err := normalizeRelPath(relPath, s.homeDoc)
 	if err != nil {
 		return "", err
 	}
@@ -135,7 +135,7 @@ func (s *Service) Diff(ctx context.Context, relPath, from, to string) (string, e
 
 // LoadRaw returns the underlying markdown content for editing purposes.
 func (s *Service) LoadRaw(relPath string) ([]byte, error) {
-	rel, err := normalizeRelPath(relPath, s.cfg.HomeDoc)
+	rel, err := normalizeRelPath(relPath, s.homeDoc)
 	if err != nil {
 		return nil, err
 	}
@@ -151,24 +151,12 @@ func (s *Service) composeCommitMessage(raw, remote string) (string, error) {
 		return "", fmt.Errorf("commit message required")
 	}
 
-	// check if prefix is really set
 	if prefix := strings.TrimSpace(s.cfg.Git.CommitMessagePrefix); prefix != "" {
-		// do not trim spaces here
 		message = s.cfg.Git.CommitMessagePrefix + message
 	}
 
-	if remote != "" && s.cfg.Git.CommitMessageAppendRemoteAddr != "" {
-		addition := s.cfg.Git.CommitMessageAppendRemoteAddr
-		if strings.Contains(addition, "%s") {
-			addition = fmt.Sprintf(addition, remote)
-		} else {
-			addition = addition + remote
-		}
-		// check if addition is really set
-		if _addition := strings.TrimSpace(addition); _addition != "" {
-			// do not trim spaces here
-			message = message + addition
-		}
+	if suffix := s.commitRemoteSuffix(remote); suffix != "" {
+		message += suffix
 	}
 
 	if message == "" {
@@ -184,4 +172,24 @@ func (s *Service) composeCommitAuthor(author string) string {
 		return trimmed
 	}
 	return strings.TrimSpace(s.cfg.Git.Author)
+}
+
+func (s *Service) commitRemoteSuffix(remote string) string {
+	addition := s.cfg.Git.CommitMessageAppendRemoteAddr
+	if strings.TrimSpace(addition) == "" {
+		return ""
+	}
+	remote = strings.TrimSpace(remote)
+	if remote == "" {
+		return ""
+	}
+	if strings.Contains(addition, "%s") {
+		addition = fmt.Sprintf(addition, remote)
+	} else {
+		addition += remote
+	}
+	if strings.TrimSpace(addition) == "" {
+		return ""
+	}
+	return addition
 }

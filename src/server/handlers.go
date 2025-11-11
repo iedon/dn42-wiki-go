@@ -207,7 +207,7 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 	if s.tryStatic(w, r) {
 		return
 	}
-	if s.redirectHTML(w, r) {
+	if s.redirectCanonical(w, r) {
 		return
 	}
 	if err := s.svc.EnsureRequestAccessible(r.URL.Path); err != nil {
@@ -269,30 +269,27 @@ func (s *Server) serveForbidden(w http.ResponseWriter, r *http.Request) {
 	writeError(w, http.StatusForbidden, "forbidden")
 }
 
-func (s *Server) redirectHTML(w http.ResponseWriter, r *http.Request) bool {
-	clean := sanitizeRequestPath(r.URL.Path)
-	lower := strings.ToLower(clean)
-	if strings.HasSuffix(lower, ".html") {
-		target := clean[:len(clean)-len(".html")]
-		switch target {
-		case "", "/", "/index":
-			target = "/"
+func (s *Server) redirectCanonical(w http.ResponseWriter, r *http.Request) bool {
+	target, alias, redirect, err := s.svc.CanonicalRedirect(r.URL.Path)
+	if err != nil {
+		if errors.Is(err, site.ErrInvalidPath) {
+			return false
 		}
-		if raw := r.URL.RawQuery; raw != "" {
-			target += "?" + raw
-		}
-		http.Redirect(w, r, target, http.StatusMovedPermanently)
-		return true
+		s.logger.Error("canonical redirect", "error", err, "path", r.URL.Path)
+		return false
 	}
-	if clean == "/index" {
-		target := "/"
-		if raw := r.URL.RawQuery; raw != "" {
-			target += "?" + raw
-		}
-		http.Redirect(w, r, target, http.StatusMovedPermanently)
-		return true
+	if !redirect {
+		return false
 	}
-	return false
+	if raw := r.URL.RawQuery; raw != "" {
+		target += "?" + raw
+	}
+	status := http.StatusMovedPermanently
+	if alias {
+		status = http.StatusFound
+	}
+	http.Redirect(w, r, target, status)
+	return true
 }
 
 func isSafeRevision(ref string) bool {

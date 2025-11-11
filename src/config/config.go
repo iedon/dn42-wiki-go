@@ -230,7 +230,9 @@ func (c *Config) IsPathPrivate(route string) bool {
 }
 
 func (c *Config) compilePrivatePages() error {
-	c.privatePagePrefixes = c.privatePagePrefixes[:0]
+	if c.privatePagePrefixes != nil {
+		c.privatePagePrefixes = c.privatePagePrefixes[:0]
+	}
 	seen := map[string]struct{}{}
 	for _, raw := range c.PrivatePagesPrefix {
 		norm, err := normalizeRoute(raw)
@@ -250,7 +252,9 @@ func (c *Config) compilePrivatePages() error {
 }
 
 func (c *Config) compileTrustedProxies() error {
-	c.trustedProxyPrefixes = c.trustedProxyPrefixes[:0]
+	if c.trustedProxyPrefixes != nil {
+		c.trustedProxyPrefixes = c.trustedProxyPrefixes[:0]
+	}
 	for _, entry := range c.TrustedProxies {
 		token := strings.TrimSpace(entry)
 		if token == "" {

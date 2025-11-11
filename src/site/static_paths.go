@@ -8,26 +8,22 @@ import (
 
 // StaticDocumentPath resolves the on-disk HTML file corresponding to a request path.
 func (s *Service) StaticDocumentPath(requestPath string) (string, error) {
-	route := sanitizeRoute(requestPath)
-	if route == "/" {
-		return filepath.Join(s.cfg.OutputDir, "index.html"), nil
+	info, ok := s.analyzeRequestPath(requestPath)
+	if !ok {
+		return "", ErrInvalidPath
 	}
-	if route == directoryPageRoute {
+	switch info.relative {
+	case "/":
+		return filepath.Join(s.cfg.OutputDir, "index.html"), nil
+	case directoryPageRoute:
 		return filepath.Join(s.cfg.OutputDir, directoryPageOutput), nil
 	}
 
-	trimmed := strings.TrimPrefix(route, "/")
-	trimmed = strings.TrimSuffix(trimmed, "/")
-	lower := strings.ToLower(trimmed)
-	if strings.HasSuffix(lower, ".html") {
-		trimmed = trimmed[:len(trimmed)-len(".html")]
-	}
-
-	mdPath, err := normalizeRelPath(trimmed, s.cfg.HomeDoc)
+	mdPath, err := normalizeRelPath(info.candidate, s.homeDoc)
 	if err != nil {
 		return "", err
 	}
-	htmlPath := htmlPathFrom(mdPath)
+	htmlPath := htmlPathFrom(mdPath, s.homeDoc)
 	return filepath.Join(s.cfg.OutputDir, filepath.FromSlash(htmlPath)), nil
 }
 
@@ -41,6 +37,7 @@ func (s *Service) ForbiddenDocumentPath() string {
 	return filepath.Join(s.cfg.OutputDir, "403.html")
 }
 
+// sanitizeRoute cleans and normalizes an HTTP route.
 func sanitizeRoute(input string) string {
 	route := strings.TrimSpace(input)
 	if route == "" {

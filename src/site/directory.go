@@ -52,7 +52,7 @@ func (s *Service) directoryEntries(ctx context.Context) ([]*templatex.DirectoryE
 		return nil, err
 	}
 
-	tree := newDirectoryTree(s.cfg.BaseURL)
+	tree := newDirectoryTree(s.cfg.BaseURL, s.homeDoc)
 	for _, file := range files {
 		if !isMarkdown(file) {
 			continue
@@ -68,13 +68,15 @@ func (s *Service) directoryEntries(ctx context.Context) ([]*templatex.DirectoryE
 
 type directoryTree struct {
 	base    string
+	homeDoc string
 	root    *directoryNode
 	anchors map[string]struct{}
 }
 
-func newDirectoryTree(base string) *directoryTree {
+func newDirectoryTree(base, homeDoc string) *directoryTree {
 	return &directoryTree{
 		base:    base,
+		homeDoc: ensureHomeDoc(homeDoc),
 		root:    newDirectoryNode("", "", "", "", nil),
 		anchors: make(map[string]struct{}),
 	}
@@ -98,8 +100,8 @@ func (t *directoryTree) add(relPath string) {
 		}
 		isLast := idx == len(segments)-1
 		if isLast {
-			route := routeFromPath(slashed)
-			if strings.EqualFold(route, directoryPageRoute) {
+			route := routeFromPath(slashed, t.homeDoc)
+			if strings.EqualFold(strings.Trim(route, "/"), strings.Trim(directoryPageRoute, "/")) {
 				break
 			}
 
