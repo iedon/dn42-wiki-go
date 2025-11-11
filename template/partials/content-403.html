@@ -1,0 +1,18 @@
+{{ define "content-403" }}
+<article class="forbidden">
+    <h1>403 - Forbidden</h1>
+    {{ if .RequestedPath }}
+    <p>Access to <code>{{ .RequestedPath }}</code> is restricted.</p>
+    {{ else }}
+    <p>You do not have permission to access the requested resource.</p>
+    {{ end }}
+    <h2>Possible reasons</h2>
+    <p>This page is only accessible from within dn42.</p>
+    <ul>
+        <li><a href="https://wiki.dn42/" target="_blank">wiki.dn42</a></li>
+        <li><a href="https://internal.dn42/" target="_blank">internal.dn42</a></li>
+    </ul>
+    <p>If you believe this is an error, please contact the site administrator.</p>
+    <p><a href="{{ baseHref .BaseURL }}">Return to the homepage</a></p>
+</article>
+{{ end }}

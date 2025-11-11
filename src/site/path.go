@@ -12,6 +12,7 @@ var reservedRouteNames = map[string]struct{}{
 	"_sidebar":     {},
 	"_footer":      {},
 	"404":          {},
+	"403":          {},
 	"_header":      {},
 	"layout":       {},
 	"readme":       {},
@@ -29,6 +30,8 @@ var (
 	ErrInvalidPath = errors.New("invalid path")
 	// ErrReservedPath indicates the caller attempted to use a reserved route name.
 	ErrReservedPath = errors.New("reserved path")
+	// ErrForbiddenRoute indicates the requested route is configured as private.
+	ErrForbiddenRoute = errors.New("route is restricted")
 )
 
 func normalizeRelPath(input, homeDoc string) (string, error) {

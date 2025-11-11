@@ -36,6 +36,11 @@ func (s *Service) NotFoundDocumentPath() string {
 	return filepath.Join(s.cfg.OutputDir, "404.html")
 }
 
+// ForbiddenDocumentPath returns the static 403 page path.
+func (s *Service) ForbiddenDocumentPath() string {
+	return filepath.Join(s.cfg.OutputDir, "403.html")
+}
+
 func sanitizeRoute(input string) string {
 	route := strings.TrimSpace(input)
 	if route == "" {

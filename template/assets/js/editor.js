@@ -3,6 +3,7 @@ const RESERVED_PATHS = new Set([
   "_sidebar",
   "_footer",
   "404",
+  "403",
   "_header",
   "layout",
   "readme",

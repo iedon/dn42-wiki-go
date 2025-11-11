@@ -26,6 +26,9 @@ func (s *Service) RenderPage(ctx context.Context, relPath string) (*templatex.Pa
 	if err != nil {
 		return nil, err
 	}
+	if err := s.ensureRouteAccessible(norm); err != nil {
+		return nil, err
+	}
 
 	if isDirectoryRoute(norm) {
 		return s.directoryPageData(ctx)
@@ -97,6 +100,41 @@ func sanitizeRequestedPath(raw string) string {
 		cleaned = "/" + cleaned
 	}
 	return cleaned
+}
+
+// RenderForbiddenPage renders a themed 403 page for restricted routes.
+func (s *Service) RenderForbiddenPage(ctx context.Context, requestedPath string) ([]byte, error) {
+	if err := s.buildLayout(ctx); err != nil {
+		return nil, err
+	}
+
+	doc := page{
+		Title: "403 - Forbidden",
+		Route: "",
+		HTML:  template.HTML(""),
+	}
+
+	data := s.pageData(doc)
+	data.Editable = false
+	data.Buttons = templatex.PageButtons{}
+	data.ContentTemplate = templatex.ForbiddenContentTemplate
+	data.ActivePath = ""
+	sanitized := strings.TrimSpace(requestedPath)
+	if sanitized != "" {
+		sanitized = sanitizeRequestedPath(sanitized)
+	}
+	data.RequestedPath = sanitized
+	description := "Access to the requested resource is restricted."
+	if sanitized != "" && sanitized != "/" {
+		description = fmt.Sprintf("Access to %s is restricted.", sanitized)
+	}
+	data.Meta = s.buildMeta(description, doc.Title, "website")
+
+	var buf bytes.Buffer
+	if err := s.templates.Render(&buf, data); err != nil {
+		return nil, err
+	}
+	return s.renderer.MinifyHTML(buf.Bytes())
 }
 
 func (s *Service) renderDocuments(ctx context.Context, files []string) ([]page, error) {
@@ -255,6 +293,18 @@ func (s *Service) writeNotFoundPage(ctx context.Context, baseDir string) error {
 		return err
 	}
 	output := filepath.Join(baseDir, "404.html")
+	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(output, pageBytes, 0o644)
+}
+
+func (s *Service) writeForbiddenPage(ctx context.Context, baseDir string) error {
+	pageBytes, err := s.RenderForbiddenPage(ctx, "")
+	if err != nil {
+		return err
+	}
+	output := filepath.Join(baseDir, "403.html")
 	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil {
 		return err
 	}

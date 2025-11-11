@@ -19,6 +19,9 @@ func (s *Service) SavePage(ctx context.Context, relPath string, content []byte, 
 	if err != nil {
 		return err
 	}
+	if err := s.ensureRouteAccessible(rel); err != nil {
+		return err
+	}
 	exists, err := s.documents.Exists(rel)
 	if err != nil {
 		return err
@@ -58,6 +61,12 @@ func (s *Service) RenamePage(ctx context.Context, oldPath, newPath, remoteAddr s
 	}
 	newRel, err := normalizeRelPath(newPath, s.cfg.HomeDoc)
 	if err != nil {
+		return err
+	}
+	if err := s.ensureRouteAccessible(oldRel); err != nil {
+		return err
+	}
+	if err := s.ensureRouteAccessible(newRel); err != nil {
 		return err
 	}
 	if oldRel == newRel {
@@ -106,6 +115,9 @@ func (s *Service) History(ctx context.Context, relPath string, page, pageSize in
 	if err != nil {
 		return nil, false, err
 	}
+	if err := s.ensureRouteAccessible(rel); err != nil {
+		return nil, false, err
+	}
 	return s.documents.History(ctx, rel, page, pageSize)
 }
 
@@ -115,6 +127,9 @@ func (s *Service) Diff(ctx context.Context, relPath, from, to string) (string, e
 	if err != nil {
 		return "", err
 	}
+	if err := s.ensureRouteAccessible(rel); err != nil {
+		return "", err
+	}
 	return s.documents.Diff(ctx, rel, from, to)
 }
 
@@ -122,6 +137,9 @@ func (s *Service) Diff(ctx context.Context, relPath, from, to string) (string, e
 func (s *Service) LoadRaw(relPath string) ([]byte, error) {
 	rel, err := normalizeRelPath(relPath, s.cfg.HomeDoc)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureRouteAccessible(rel); err != nil {
 		return nil, err
 	}
 	return s.documents.Read(rel)

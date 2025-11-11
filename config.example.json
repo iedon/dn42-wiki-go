@@ -28,5 +28,8 @@
   "tlsKey": "./server.key",
   "logLevel": "info",
   "trustedProxies": ["127.0.0.1", "::1/128"],
-  "trustedRemoteAddrLevel": 1
+  "trustedRemoteAddrLevel": 1,
+  "privatePagesPrefix": [
+    "/internal"
+  ]
 }

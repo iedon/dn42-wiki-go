@@ -60,7 +60,6 @@ func (s *Service) buildLayout(ctx context.Context) error {
 	} else {
 		sidebarHTML = template.HTML(fragment.HTML)
 	}
-
 	if trimmed := strings.TrimSpace(s.cfg.ServerFooter); trimmed != "" {
 		rendered, err := s.renderer.Render([]byte(trimmed))
 		if err != nil {
@@ -141,6 +140,9 @@ func (s *Service) BuildStatic(ctx context.Context) error {
 		return err
 	}
 	if err := s.writeNotFoundPage(ctx, tempDir); err != nil {
+		return err
+	}
+	if err := s.writeForbiddenPage(ctx, tempDir); err != nil {
 		return err
 	}
 

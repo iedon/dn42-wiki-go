@@ -50,9 +50,11 @@ type Config struct {
 	LogLevel               string         `json:"logLevel"`
 	TrustedProxies         []string       `json:"trustedProxies"`
 	TrustedRemoteAddrLevel int            `json:"trustedRemoteAddrLevel"`
+	PrivatePagesPrefix     []string       `json:"privatePagesPrefix"`
 	PullInterval           time.Duration  `json:"-"`
 	PushInterval           time.Duration  `json:"-"`
 	trustedProxyPrefixes   []netip.Prefix `json:"-"`
+	privatePagePrefixes    []string       `json:"-"`
 }
 
 func (g *GitConfig) UnmarshalJSON(data []byte) error {
@@ -171,6 +173,9 @@ func (c *Config) applyDefaults() error {
 	if err := c.compileTrustedProxies(); err != nil {
 		return err
 	}
+	if err := c.compilePrivatePages(); err != nil {
+		return err
+	}
 
 	c.PullInterval = time.Duration(c.Git.PullIntervalSec) * time.Second
 	if c.Git.Remote == "" {
@@ -198,6 +203,48 @@ func (c *Config) validate() error {
 		if c.TLSCert == "" || c.TLSKey == "" {
 			return fmt.Errorf("tls enabled but certificates missing")
 		}
+	}
+	return nil
+}
+
+func (c *Config) IsPathPrivate(route string) bool {
+	if len(c.privatePagePrefixes) == 0 {
+		return false
+	}
+	normalized, err := normalizeRoute(route)
+	if err != nil {
+		return false
+	}
+	if normalized == "" {
+		normalized = "/"
+	}
+	for _, prefix := range c.privatePagePrefixes {
+		if prefix == "/" {
+			return true
+		}
+		if normalized == prefix || strings.HasPrefix(normalized, prefix+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Config) compilePrivatePages() error {
+	c.privatePagePrefixes = c.privatePagePrefixes[:0]
+	seen := map[string]struct{}{}
+	for _, raw := range c.PrivatePagesPrefix {
+		norm, err := normalizeRoute(raw)
+		if err != nil {
+			return fmt.Errorf("invalid private route prefix %q: %w", raw, err)
+		}
+		if norm == "" {
+			continue
+		}
+		if _, ok := seen[norm]; ok {
+			continue
+		}
+		seen[norm] = struct{}{}
+		c.privatePagePrefixes = append(c.privatePagePrefixes, norm)
 	}
 	return nil
 }
@@ -230,6 +277,33 @@ func (c *Config) compileTrustedProxies() error {
 		c.trustedProxyPrefixes = append(c.trustedProxyPrefixes, prefix)
 	}
 	return nil
+}
+
+func normalizeRoute(raw string) (string, error) {
+	trimmed := strings.TrimSpace(strings.ReplaceAll(raw, "\\", "/"))
+	if trimmed == "" {
+		return "", nil
+	}
+	if !strings.HasPrefix(trimmed, "/") {
+		trimmed = "/" + trimmed
+	}
+	cleaned := path.Clean(trimmed)
+	if cleaned == "." || cleaned == "" {
+		cleaned = "/"
+	}
+	if !strings.HasPrefix(cleaned, "/") {
+		cleaned = "/" + cleaned
+	}
+	if strings.HasPrefix(cleaned, "/..") || strings.Contains(cleaned, "/../") {
+		return "", fmt.Errorf("path escapes root")
+	}
+	if cleaned != "/" {
+		cleaned = strings.TrimSuffix(cleaned, "/")
+		if cleaned == "" {
+			cleaned = "/"
+		}
+	}
+	return cleaned, nil
 }
 
 func normalizeHomeDoc(input string) string {

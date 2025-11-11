@@ -13,6 +13,7 @@ import (
 const (
 	DefaultContentTemplate   = "content-default"
 	NotFoundContentTemplate  = "content-404"
+	ForbiddenContentTemplate = "content-403"
 	DirectoryContentTemplate = "content-directory"
 	LayoutTemplate           = "layout"
 )

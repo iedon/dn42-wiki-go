@@ -32,6 +32,8 @@ func (s *Server) handleHistory(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, site.ErrInvalidPath):
 			writeError(w, http.StatusBadRequest, err.Error())
+		case errors.Is(err, site.ErrForbiddenRoute):
+			writeError(w, http.StatusForbidden, "requested path is restricted")
 		default:
 			writeError(w, http.StatusInternalServerError, err.Error())
 		}
@@ -61,6 +63,8 @@ func (s *Server) handleDiff(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, site.ErrInvalidPath):
 			writeError(w, http.StatusBadRequest, err.Error())
+		case errors.Is(err, site.ErrForbiddenRoute):
+			writeError(w, http.StatusForbidden, "requested path is restricted")
 		default:
 			writeError(w, http.StatusInternalServerError, err.Error())
 		}
@@ -82,6 +86,8 @@ func (s *Server) handleDocument(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, err.Error())
 		case errors.Is(err, os.ErrNotExist):
 			writeError(w, http.StatusNotFound, "document not found")
+		case errors.Is(err, site.ErrForbiddenRoute):
+			writeError(w, http.StatusForbidden, "requested path is restricted")
 		default:
 			writeError(w, http.StatusInternalServerError, err.Error())
 		}
@@ -115,6 +121,8 @@ func (s *Server) handleSave(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "The specified path is reserved and cannot be used")
 		case errors.Is(err, site.ErrInvalidPath):
 			writeError(w, http.StatusBadRequest, err.Error())
+		case errors.Is(err, site.ErrForbiddenRoute):
+			writeError(w, http.StatusForbidden, "requested path is restricted")
 		default:
 			writeError(w, http.StatusInternalServerError, err.Error())
 		}
@@ -151,6 +159,8 @@ func (s *Server) handleRename(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "The specified path is reserved and cannot be used")
 		case errors.Is(err, site.ErrInvalidPath):
 			writeError(w, http.StatusBadRequest, err.Error())
+		case errors.Is(err, site.ErrForbiddenRoute):
+			writeError(w, http.StatusForbidden, "requested path is restricted")
 		default:
 			writeError(w, http.StatusInternalServerError, err.Error())
 		}
@@ -200,6 +210,17 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 	if s.redirectHTML(w, r) {
 		return
 	}
+	if err := s.svc.EnsureRequestAccessible(r.URL.Path); err != nil {
+		switch {
+		case errors.Is(err, site.ErrForbiddenRoute):
+			s.serveForbidden(w, r)
+		case errors.Is(err, site.ErrInvalidPath):
+			s.serveNotFound(w, r)
+		default:
+			writeError(w, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
 
 	staticPath, err := s.svc.StaticDocumentPath(r.URL.Path)
 	if err != nil {
@@ -233,17 +254,19 @@ func (s *Server) serveNotFound(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(page)
 		return
 	}
-
-	path := s.svc.NotFoundDocumentPath()
-	if isWithin(s.cfg.OutputDir, path) {
-		if data, err := os.ReadFile(path); err == nil {
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			w.WriteHeader(http.StatusNotFound)
-			_, _ = w.Write(data)
-			return
-		}
-	}
+	// fallback
 	writeError(w, http.StatusNotFound, "not found")
+}
+
+func (s *Server) serveForbidden(w http.ResponseWriter, r *http.Request) {
+	if page, err := s.svc.RenderForbiddenPage(r.Context(), r.URL.Path); err == nil {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write(page)
+		return
+	}
+	// fallback
+	writeError(w, http.StatusForbidden, "forbidden")
 }
 
 func (s *Server) redirectHTML(w http.ResponseWriter, r *http.Request) bool {
