@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -41,6 +42,17 @@ type requestAnalysis struct {
 	candidate     string
 	hadHTML       bool
 	trailingSlash bool
+}
+
+// documentTargets resolves the markdown source, canonical route, and HTML output path.
+func (a requestAnalysis) documentTargets(homeDoc string) (string, string, string, error) {
+	rel, err := normalizeRelPath(a.candidate, homeDoc)
+	if err != nil {
+		return "", "", "", err
+	}
+	route := routeFromPath(rel, homeDoc)
+	html := htmlPathFrom(rel, homeDoc)
+	return rel, route, html, nil
 }
 
 // buildLayout constructs the common layout fragments.
@@ -126,6 +138,10 @@ func NewService(cfg *config.Config, repo *gitutil.Repository, templates *templat
 		layout:      newLayoutCache(),
 		search:      newSearchCatalog(),
 	}
+}
+
+func (s *Service) searchIndexPath() string {
+	return path.Join("/", s.cfg.BaseURL, "search-index.json")
 }
 
 func (s *Service) analyzeRequestPath(requestPath string) (requestAnalysis, bool) {
@@ -215,11 +231,10 @@ func (s *Service) CanonicalRedirect(requestPath string) (string, bool, bool, err
 		}
 	}
 
-	rel, err := normalizeRelPath(info.candidate, s.homeDoc)
+	rel, route, _, err := info.documentTargets(s.homeDoc)
 	if err != nil {
 		return "", false, false, err
 	}
-	route := routeFromPath(rel, s.homeDoc)
 	canonical := s.pathWithBase(route)
 	alias := route == "/" && info.candidate != ""
 	redirect := info.original != canonical

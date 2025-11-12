@@ -1,0 +1,14 @@
+version: "3.9"
+
+services:
+  dn42-wiki-go:
+    build: .
+    image: dn42-wiki-go:latest
+    # ports:
+    #   - "8080:8080"
+    volumes:
+      - ./config.json:/app/config.json:ro
+      - ./data/dist:/app/dist
+      - ./data/repo:/app/repo
+    restart: always
+    command: ["--config", "/app/config.json"]

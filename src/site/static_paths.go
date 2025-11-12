@@ -19,11 +19,10 @@ func (s *Service) StaticDocumentPath(requestPath string) (string, error) {
 		return filepath.Join(s.cfg.OutputDir, directoryPageOutput), nil
 	}
 
-	mdPath, err := normalizeRelPath(info.candidate, s.homeDoc)
+	_, _, htmlPath, err := info.documentTargets(s.homeDoc)
 	if err != nil {
 		return "", err
 	}
-	htmlPath := htmlPathFrom(mdPath, s.homeDoc)
 	return filepath.Join(s.cfg.OutputDir, filepath.FromSlash(htmlPath)), nil
 }
 

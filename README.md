@@ -60,7 +60,7 @@ Configuration is supplied as JSON. Below is a description of every option and th
 - `webhook.enabled` *(bool, default `false`)*: Expose webhook endpoints on the main HTTP server.
 - `webhook.secret` *(string, default empty)*: Shared secret expected in the `Authorization` header. Ignored when empty.
 - `webhook.polling.enabled` *(bool, default `false`)*: Keep a registration active with the remote notification service and trigger periodic pulls.
-- `webhook.polling.endpoint` *(string, default empty)*: Base URL of the notification service (the client posts to `<endpoint>/poll`).
+- `webhook.polling.endpoint` *(string, default empty)*: URL of the notification service (eg. Usage with [dn42notifyd](https://git.dn42.dev/dn42/dn42notifyd): `https://git.dn42/dn42notify/poll`).
 - `webhook.polling.callbackUrl` *(string, default empty)*: Public URL for `/api/webhook/pull`. Required when `webhook.polling.enabled` is `true`.
 - `webhook.polling.pollingIntervalSec` *(int, default `3600`)*: Seconds between refresh attempts. Must be positive when polling is enabled.
 
@@ -68,6 +68,7 @@ Configuration is supplied as JSON. Below is a description of every option and th
 - `outputDir` *(string, default `./dist`)*: Destination directory for static builds or asset exports.
 - `templateDir` *(string, default `./template`)*: Location of layout templates and static assets bundled into the server/UI.
 - `homeDoc` *(string, default `Home.md`)*: Repository document to treat as the home page. Normalised to a `.md` path relative to the repo root.
+- `privatePagesPrefix` *(array of strings, default empty)*: Request to routes started with these prefixes will be blocked.
 
 ### Layout and footer
 - `ignoreHeader` *(bool, default `false`)*: Skip loading `_Header.md` when `true`. Leave `false` to include the fragment when present.

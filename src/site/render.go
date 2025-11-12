@@ -214,7 +214,7 @@ func (s *Service) pageData(doc page) *templatex.PageData {
 			EnableEdit:    s.cfg.Editable,
 			EnableNew:     s.cfg.Editable,
 		},
-		SearchIndexURL:  path.Join("/", s.cfg.BaseURL, "search-index.json"),
+		SearchIndexURL:  s.searchIndexPath(),
 		Live:            s.cfg.Live,
 		BaseURL:         s.cfg.BaseURL,
 		Breadcrumbs:     buildBreadcrumbs(doc.Route, doc.Title, s.cfg.BaseURL),
@@ -247,7 +247,7 @@ func (s *Service) directoryPageData(ctx context.Context) (*templatex.PageData, e
 		RequestedPath:    directoryPageRoute,
 		Editable:         false,
 		Buttons:          templatex.PageButtons{},
-		SearchIndexURL:   path.Join("/", s.cfg.BaseURL, "search-index.json"),
+		SearchIndexURL:   s.searchIndexPath(),
 		Live:             s.cfg.Live,
 		BaseURL:          s.cfg.BaseURL,
 		Breadcrumbs: []templatex.Breadcrumb{

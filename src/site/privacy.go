@@ -30,11 +30,11 @@ func (s *Service) routeFromRequestPath(requestPath string) (string, error) {
 	if info.relative == "/" {
 		return "/", nil
 	}
-	rel, err := normalizeRelPath(info.candidate, s.homeDoc)
+	_, route, _, err := info.documentTargets(s.homeDoc)
 	if err != nil {
 		return "", err
 	}
-	return routeFromPath(rel, s.homeDoc), nil
+	return route, nil
 }
 
 // EnsureRequestAccessible validates whether the provided HTTP route is accessible in live mode.

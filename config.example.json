@@ -33,7 +33,7 @@
   "tlsCert": "./server.crt",
   "tlsKey": "./server.key",
   "logLevel": "info",
-  "trustedProxies": ["127.0.0.1", "::1/128"],
+  "trustedProxies": ["127.0.0.1", "::1/128", "172.16.0.0/16", "172.17.0.0/16", "172.18.0.0/16", "192.168.0.0/16"],
   "trustedRemoteAddrLevel": 1,
   "privatePagesPrefix": [
     "/internal"
