@@ -15,7 +15,11 @@ import (
 )
 
 // CommandTimeout bounds synchronous git invocations.
-const CommandTimeout = 60 * time.Second
+const CommandTimeout = 120 * time.Second
+
+// ErrRemoteAhead indicates the upstream repository contains commits the
+// local clone has not incorporated yet.
+var ErrRemoteAhead = errors.New("remote contains newer commits")
 
 // Repository represents a cloned git repository and offers limited VCS operations.
 type Repository struct {
@@ -94,6 +98,25 @@ func (r *Repository) pullWithRebase(ctx context.Context) error {
 	return nil
 }
 
+// RemoteAhead reports whether the upstream branch contains commits that are
+// not present locally.
+func (r *Repository) RemoteAhead(ctx context.Context) (bool, error) {
+	if strings.TrimSpace(r.Remote) == "" {
+		return false, nil
+	}
+
+	ctx, cancel := ensureContext(ctx)
+	defer cancel()
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if err := r.fetchLocked(ctx); err != nil {
+		return false, err
+	}
+	return r.remoteAheadLocked(ctx)
+}
+
 func (r *Repository) headHash(ctx context.Context) (string, error) {
 	cmd := r.command(ctx, "rev-parse", "HEAD")
 	out, err := cmd.Output()
@@ -115,6 +138,22 @@ func needsRebaseFallback(output string) bool {
 	}
 	for _, marker := range markers {
 		if strings.Contains(output, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func isNonFastForward(output string) bool {
+	markers := []string{
+		"non-fast-forward",
+		"fetch first",
+		"Updates were rejected because",
+		"failed to push some refs",
+	}
+	lowered := strings.ToLower(output)
+	for _, marker := range markers {
+		if strings.Contains(lowered, strings.ToLower(marker)) {
 			return true
 		}
 	}
@@ -240,6 +279,9 @@ func (r *Repository) Push(ctx context.Context) error {
 	cmd := r.command(ctx, "push")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		outStr := string(out)
+		if isNonFastForward(outStr) {
+			return errors.Join(ErrRemoteAhead, fmt.Errorf("git push rejected: %s", strings.TrimSpace(outStr)))
+		}
 		return fmt.Errorf("git push: %w (%s)", err, outStr)
 	}
 	return nil
@@ -382,4 +424,58 @@ func normalizePaths(paths []string) []string {
 
 func parseUnix(raw []byte) (int64, error) {
 	return strconv.ParseInt(string(raw), 10, 64)
+}
+
+func (r *Repository) fetchLocked(ctx context.Context) error {
+	cmd := r.command(ctx, "fetch", "--quiet")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git fetch: %w (%s)", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+func (r *Repository) remoteAheadLocked(ctx context.Context) (bool, error) {
+	cmd := r.command(ctx, "rev-list", "--left-right", "--count", "HEAD...@{u}")
+	out, err := cmd.CombinedOutput()
+	output := strings.TrimSpace(string(out))
+	if err != nil {
+		if output == "" {
+			output = err.Error()
+		}
+		if strings.Contains(output, "no upstream configured") || strings.Contains(output, "missing upstream") || strings.Contains(output, "does not point to a branch") {
+			return false, nil
+		}
+		return false, fmt.Errorf("git rev-list: %w (%s)", err, output)
+	}
+	if output == "" {
+		return false, nil
+	}
+	fields := strings.Fields(output)
+	if len(fields) < 2 {
+		return false, fmt.Errorf("git rev-list: unexpected output: %q", output)
+	}
+	remoteAhead, convErr := strconv.Atoi(fields[1])
+	if convErr != nil {
+		return false, fmt.Errorf("git rev-list: parse output: %w", convErr)
+	}
+	return remoteAhead > 0, nil
+}
+
+// ResetSoft rewinds HEAD while preserving staged and working tree changes.
+func (r *Repository) ResetSoft(ctx context.Context, target string) error {
+	if strings.TrimSpace(target) == "" {
+		return errors.New("reset target required")
+	}
+
+	ctx, cancel := ensureContext(ctx)
+	defer cancel()
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	cmd := r.command(ctx, "reset", "--soft", target)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git reset --soft %s: %w (%s)", target, err, strings.TrimSpace(string(out)))
+	}
+	return nil
 }

@@ -117,6 +117,8 @@ func (s *Server) handleSave(w http.ResponseWriter, r *http.Request) {
 	remote := s.clientRemoteAddr(r)
 	if err := s.svc.SavePage(r.Context(), payload.Path, []byte(payload.Content), payload.Message, remote); err != nil {
 		switch {
+		case errors.Is(err, site.ErrRepositoryBehind):
+			writeError(w, http.StatusConflict, "remote repository has newer revisions; please save current work and reload")
 		case errors.Is(err, site.ErrReservedPath):
 			writeError(w, http.StatusBadRequest, "The specified path is reserved and cannot be used")
 		case errors.Is(err, site.ErrInvalidPath):
@@ -155,6 +157,8 @@ func (s *Server) handleRename(w http.ResponseWriter, r *http.Request) {
 	remote := s.clientRemoteAddr(r)
 	if err := s.svc.RenamePage(r.Context(), payload.OldPath, payload.NewPath, remote); err != nil {
 		switch {
+		case errors.Is(err, site.ErrRepositoryBehind):
+			writeError(w, http.StatusConflict, "remote repository has newer revisions; please reload")
 		case errors.Is(err, site.ErrReservedPath):
 			writeError(w, http.StatusBadRequest, "The specified path is reserved and cannot be used")
 		case errors.Is(err, site.ErrInvalidPath):

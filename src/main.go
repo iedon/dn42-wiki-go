@@ -62,9 +62,6 @@ func main() {
 	}
 
 	go pullLoop(ctx, svc, cfg.PullInterval, logger)
-	if cfg.PushInterval > 0 && strings.TrimSpace(cfg.Git.Remote) != "" {
-		go pushLoop(ctx, svc, cfg.PushInterval, logger)
-	}
 
 	srv := server.New(cfg, svc, logger, SERVER_HEADER)
 	if err := srv.Start(ctx); err != nil {
@@ -86,24 +83,6 @@ func pullLoop(ctx context.Context, svc *site.Service, interval time.Duration, lo
 		case <-ticker.C:
 			if err := svc.Pull(ctx); err != nil {
 				logger.Warn("pull", "error", err)
-			}
-		}
-	}
-}
-
-func pushLoop(ctx context.Context, svc *site.Service, interval time.Duration, logger *slog.Logger) {
-	if interval <= 0 {
-		return
-	}
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			if err := svc.Push(ctx); err != nil {
-				logger.Warn("push", "error", err)
 			}
 		}
 	}

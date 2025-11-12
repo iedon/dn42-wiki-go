@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/iedon/dn42-wiki-go/config"
 	"github.com/iedon/dn42-wiki-go/fsutil"
@@ -30,6 +31,8 @@ type Service struct {
 	documents *DocumentStore
 	layout    *LayoutCache
 	search    *SearchCatalog
+
+	writeMu sync.Mutex
 }
 type requestAnalysis struct {
 	original      string

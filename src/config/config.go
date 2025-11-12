@@ -20,7 +20,6 @@ type GitConfig struct {
 	Remote                        string `json:"remote"`
 	LocalDirectory                string `json:"localDirectory"`
 	PullIntervalSec               int    `json:"pullIntervalSec"`
-	PushIntervalSec               int    `json:"pushIntervalSec"`
 	Author                        string `json:"author"`
 	CommitMessagePrefix           string `json:"commitMessagePrefix"`
 	CommitMessageAppendRemoteAddr string `json:"commitMessageAppendRemoteAddr"`
@@ -52,7 +51,6 @@ type Config struct {
 	TrustedRemoteAddrLevel int            `json:"trustedRemoteAddrLevel"`
 	PrivatePagesPrefix     []string       `json:"privatePagesPrefix"`
 	PullInterval           time.Duration  `json:"-"`
-	PushInterval           time.Duration  `json:"-"`
 	trustedProxyPrefixes   []netip.Prefix `json:"-"`
 	privatePagePrefixes    []string       `json:"-"`
 }
@@ -63,7 +61,6 @@ func (g *GitConfig) UnmarshalJSON(data []byte) error {
 		Remote                        string `json:"remote"`
 		LocalDirectory                string `json:"localDirectory"`
 		PullIntervalSec               int    `json:"pullIntervalSec"`
-		PushIntervalSec               *int   `json:"pushIntervalSec"`
 		Author                        string `json:"author"`
 		CommitMessagePrefix           string `json:"commitMessagePrefix"`
 		CommitMessageAppendRemoteAddr string `json:"commitMessageAppendRemoteAddr"`
@@ -81,12 +78,6 @@ func (g *GitConfig) UnmarshalJSON(data []byte) error {
 	g.Author = raw.Author
 	g.CommitMessagePrefix = raw.CommitMessagePrefix
 	g.CommitMessageAppendRemoteAddr = raw.CommitMessageAppendRemoteAddr
-	g.pushIntervalDefined = raw.PushIntervalSec != nil
-	if raw.PushIntervalSec != nil {
-		g.PushIntervalSec = *raw.PushIntervalSec
-	} else {
-		g.PushIntervalSec = 0
-	}
 	return nil
 }
 
@@ -152,12 +143,6 @@ func (c *Config) applyDefaults() error {
 	if c.Git.PullIntervalSec <= 0 {
 		c.Git.PullIntervalSec = 300
 	}
-	if !c.Git.pushIntervalDefined {
-		c.Git.PushIntervalSec = 0
-	}
-	if c.Git.PushIntervalSec < 0 {
-		c.Git.PushIntervalSec = 0
-	}
 	if c.LogLevel == "" {
 		c.LogLevel = "info"
 	}
@@ -181,23 +166,12 @@ func (c *Config) applyDefaults() error {
 	if c.Git.Remote == "" {
 		c.PullInterval = 0
 	}
-	if c.Git.PushIntervalSec > 0 {
-		c.PushInterval = time.Duration(c.Git.PushIntervalSec) * time.Second
-	} else {
-		c.PushInterval = 0
-	}
-	if c.Git.Remote == "" {
-		c.PushInterval = 0
-	}
 	return nil
 }
 
 func (c *Config) validate() error {
 	if c.PullInterval < 0 {
 		return fmt.Errorf("negative pull interval")
-	}
-	if c.PushInterval < 0 {
-		return fmt.Errorf("negative push interval")
 	}
 	if c.EnableTLS {
 		if c.TLSCert == "" || c.TLSKey == "" {

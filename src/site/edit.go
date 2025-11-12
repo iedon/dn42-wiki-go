@@ -2,6 +2,7 @@ package site
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -13,6 +14,13 @@ import (
 func (s *Service) SavePage(ctx context.Context, relPath string, content []byte, message, remoteAddr string) error {
 	if !s.cfg.Editable {
 		return fmt.Errorf("editing disabled")
+	}
+
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+
+	if err := s.ensureRepositoryFresh(ctx); err != nil {
+		return err
 	}
 
 	rel, err := normalizeRelPath(relPath, s.homeDoc)
@@ -43,7 +51,7 @@ func (s *Service) SavePage(ctx context.Context, relPath string, content []byte, 
 	if err := s.BuildStatic(ctx); err != nil {
 		return fmt.Errorf("build static: %w", err)
 	}
-	return nil
+	return s.finalizeCommit(ctx)
 }
 
 // RenamePage moves a document and commits the rename.
@@ -53,6 +61,13 @@ func (s *Service) RenamePage(ctx context.Context, oldPath, newPath, remoteAddr s
 	}
 	if strings.TrimSpace(newPath) == "" {
 		return fmt.Errorf("new path required")
+	}
+
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+
+	if err := s.ensureRepositoryFresh(ctx); err != nil {
+		return err
 	}
 
 	oldRel, err := normalizeRelPath(oldPath, s.homeDoc)
@@ -106,7 +121,7 @@ func (s *Service) RenamePage(ctx context.Context, oldPath, newPath, remoteAddr s
 	if err := s.BuildStatic(ctx); err != nil {
 		return fmt.Errorf("build static: %w", err)
 	}
-	return nil
+	return s.finalizeCommit(ctx)
 }
 
 // History returns commit metadata for the provided path.
@@ -192,4 +207,44 @@ func (s *Service) commitRemoteSuffix(remote string) string {
 		return ""
 	}
 	return addition
+}
+
+func (s *Service) ensureRepositoryFresh(ctx context.Context) error {
+	stale, err := s.repo.RemoteAhead(ctx)
+	if err != nil {
+		return err
+	}
+	if stale {
+		return ErrRepositoryBehind
+	}
+	return nil
+}
+
+func (s *Service) finalizeCommit(ctx context.Context) error {
+	if strings.TrimSpace(s.cfg.Git.Remote) == "" {
+		return nil
+	}
+
+	stale, err := s.repo.RemoteAhead(ctx)
+	if err != nil {
+		return err
+	}
+	if stale {
+		return s.rollbackWithConflict(ctx)
+	}
+
+	if err := s.repo.Push(ctx); err != nil {
+		if errors.Is(err, gitutil.ErrRemoteAhead) {
+			return s.rollbackWithConflict(ctx)
+		}
+		return err
+	}
+	return nil
+}
+
+func (s *Service) rollbackWithConflict(ctx context.Context) error {
+	if err := s.repo.ResetSoft(ctx, "HEAD@{1}"); err != nil {
+		return errors.Join(ErrRepositoryBehind, fmt.Errorf("rollback failed: %w", err))
+	}
+	return ErrRepositoryBehind
 }
