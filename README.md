@@ -63,6 +63,7 @@ Configuration is supplied as JSON. Below is a description of every option and th
 - `webhook.polling.endpoint` *(string, default empty)*: URL of the notification service (eg. Usage with [dn42notifyd](https://git.dn42.dev/dn42/dn42notifyd): `https://git.dn42/dn42notify/poll`).
 - `webhook.polling.callbackUrl` *(string, default empty)*: Public URL for `/api/webhook/pull`. Required when `webhook.polling.enabled` is `true`.
 - `webhook.polling.pollingIntervalSec` *(int, default `3600`)*: Seconds between refresh attempts. Must be positive when polling is enabled.
+- `webhook.polling.skipRemoteCert` *(bool, default `false`)*: Insecure: Skip TLS verification.
 
 ### Paths and templating
 - `outputDir` *(string, default `./dist`)*: Destination directory for static builds or asset exports.

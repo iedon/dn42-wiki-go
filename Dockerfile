@@ -1,12 +1,16 @@
 # syntax=docker/dockerfile:1
 
 FROM golang:1.25-trixie AS builder
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+ARG COMMIT_ID=docker
 WORKDIR /workspace
-COPY src/go.mod src/go.sum ./
-RUN go mod download
-COPY src/. ./
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} \
-    go build -ldflags="-s -w -X main.GIT_COMMIT=docker" -o /workspace/dn42-wiki-go ./
+ADD src /workspace/src
+WORKDIR /workspace/src
+RUN go mod tidy
+RUN go get
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -ldflags="-s -w -X main.GIT_COMMIT=${COMMIT_ID}" -o /workspace/dn42-wiki-go ./
 
 FROM debian:trixie-slim AS runtime
 RUN apt-get update && \

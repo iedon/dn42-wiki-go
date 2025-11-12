@@ -33,6 +33,7 @@ type WebhookPollingConfig struct {
 	Endpoint           string        `json:"endpoint"`
 	CallbackURL        string        `json:"callbackUrl"`
 	PollingIntervalSec int           `json:"pollingIntervalSec"`
+	SkipRemoteCert     bool          `json:"skipRemoteCert"`
 	interval           time.Duration `json:"-"`
 }
 

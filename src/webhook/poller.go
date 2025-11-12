@@ -3,6 +3,7 @@ package webhook
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -40,7 +41,12 @@ func NewPoller(cfg *config.Config, svc *site.Service, logger *slog.Logger, userA
 		return nil, fmt.Errorf("invalid polling interval")
 	}
 
-	client := &http.Client{Timeout: 20 * time.Second}
+	client := &http.Client{Timeout: 30 * time.Second}
+	if cfg.Webhook.Polling.SkipRemoteCert {
+		client.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+	}
 
 	return &Poller{
 		cfg:       cfg,

@@ -18,7 +18,8 @@
       "enabled": false,
       "endpoint": "https://git.dn42/dn42notify/poll",
       "callbackUrl": "https://dn42.jp/api/webhook/pull",
-      "pollingIntervalSec": 3600
+      "pollingIntervalSec": 3600,
+      "skipRemoteCert": false
     }
   },
   "outputDir": "./dist",
