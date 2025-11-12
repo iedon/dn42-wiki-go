@@ -28,6 +28,8 @@ This project aims to replace the old, Gollum based DN42 distributed wiki.
    ```
 5. Use `build.sh` for a one-shot build that drops the binary, templates, and example config into `dist/`.
 
+For production roll-outs (systemd, reverse proxies, anycast routing, containers), see [`DEPLOYMENT.md`](DEPLOYMENT.md).
+
 ## Webhook endpoints
 When `"webhook.enabled": true` the primary HTTP server exposes:
 - `GET|POST /api/webhook/pull` – trigger a `git pull` followed by static cache rebuild.
