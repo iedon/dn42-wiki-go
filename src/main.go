@@ -15,6 +15,7 @@ import (
 	"github.com/iedon/dn42-wiki-go/server"
 	"github.com/iedon/dn42-wiki-go/site"
 	"github.com/iedon/dn42-wiki-go/templatex"
+	"github.com/iedon/dn42-wiki-go/webhook"
 )
 
 func main() {
@@ -62,8 +63,15 @@ func main() {
 	}
 
 	go pullLoop(ctx, svc, cfg.PullInterval, logger)
+	if cfg.Webhook.Enabled && cfg.Webhook.Polling.Enabled {
+		if poller, err := webhook.NewPoller(cfg, svc, logger, SERVER_SIGNATURE); err != nil {
+			logger.Warn("webhook poller", "error", err)
+		} else {
+			go poller.Run(ctx)
+		}
+	}
 
-	srv := server.New(cfg, svc, logger, SERVER_HEADER)
+	srv := server.New(cfg, svc, logger, SERVER_SIGNATURE)
 	if err := srv.Start(ctx); err != nil {
 		logger.Error("server", "error", err)
 		os.Exit(1)

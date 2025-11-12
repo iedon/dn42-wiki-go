@@ -75,16 +75,34 @@ func (s *Service) RenderForbiddenPage(ctx context.Context, requestedPath string)
 	return s.renderStatusPage(ctx, requestedPath, cfg)
 }
 
+// sanitizeRequestedPath cleans up a raw requested path for display purposes.
 func sanitizeRequestedPath(raw string) string {
-	trimmed := strings.TrimSpace(raw)
-	trimmed = strings.TrimPrefix(trimmed, "/")
-	cleaned := path.Clean("/" + trimmed)
-	if cleaned == "." || cleaned == "" {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
 		return "/"
 	}
-	if !strings.HasPrefix(cleaned, "/") {
-		cleaned = "/" + cleaned
+
+	// Remember if there was a trailing slash (but not for root "/")
+	trailingSlash := strings.HasSuffix(raw, "/") && raw != "/"
+
+	// Normalize leading slash before cleaning
+	if !strings.HasPrefix(raw, "/") {
+		raw = "/" + raw
 	}
+
+	// path.Clean removes extra slashes, "." and ".."
+	cleaned := path.Clean(raw)
+
+	// Ensure result is absolute
+	if cleaned == "." || cleaned == "" {
+		cleaned = "/"
+	}
+
+	// Restore trailing slash if appropriate
+	if trailingSlash && cleaned != "/" {
+		cleaned += "/"
+	}
+
 	return cleaned
 }
 

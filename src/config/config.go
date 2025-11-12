@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -23,7 +24,23 @@ type GitConfig struct {
 	Author                        string `json:"author"`
 	CommitMessagePrefix           string `json:"commitMessagePrefix"`
 	CommitMessageAppendRemoteAddr string `json:"commitMessageAppendRemoteAddr"`
-	pushIntervalDefined           bool   `json:"-"`
+	repositoryPath                string `json:"-"`
+}
+
+// WebhookPollingConfig describes background poll/refresh behaviour for remote notifications.
+type WebhookPollingConfig struct {
+	Enabled            bool          `json:"enabled"`
+	Endpoint           string        `json:"endpoint"`
+	CallbackURL        string        `json:"callbackUrl"`
+	PollingIntervalSec int           `json:"pollingIntervalSec"`
+	interval           time.Duration `json:"-"`
+}
+
+// WebhookConfig controls inbound webhook endpoints and optional remote poll integration.
+type WebhookConfig struct {
+	Enabled bool                 `json:"enabled"`
+	Secret  string               `json:"secret"`
+	Polling WebhookPollingConfig `json:"polling"`
 }
 
 // Config encapsulates runtime and build-time options.
@@ -32,9 +49,7 @@ type Config struct {
 	Editable               bool           `json:"editable"`
 	Listen                 string         `json:"listen"`
 	Git                    GitConfig      `json:"git"`
-	WebhookEnabled         bool           `json:"webHook"`
-	WebhookListen          string         `json:"webHookListen"`
-	WebhookAuthPreShared   string         `json:"webHookAuthPreShared"`
+	Webhook                WebhookConfig  `json:"webhook"`
 	OutputDir              string         `json:"outputDir"`
 	TemplateDir            string         `json:"templateDir"`
 	HomeDoc                string         `json:"homeDoc"`
@@ -81,6 +96,16 @@ func (g *GitConfig) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// RepositoryPath reports the derived owner/name portion of the configured remote.
+func (g *GitConfig) RepositoryPath() string {
+	return g.repositoryPath
+}
+
+// Interval returns the effective polling cadence.
+func (p WebhookPollingConfig) Interval() time.Duration {
+	return p.interval
+}
+
 // Load reads configuration from disk and applies sane defaults.
 func Load(path string) (*Config, error) {
 	file, err := os.Open(filepath.Clean(path))
@@ -113,21 +138,17 @@ func (c *Config) applyDefaults() error {
 	if c.Listen == "" {
 		c.Listen = ":8080"
 	}
-	if c.WebhookListen == "" {
-		c.WebhookListen = ":8081"
-	}
 	if c.OutputDir == "" {
 		c.OutputDir = "./dist"
 	}
 	if c.TemplateDir == "" {
 		c.TemplateDir = "./template"
 	}
-	c.WebhookAuthPreShared = strings.TrimSpace(c.WebhookAuthPreShared)
 	c.HomeDoc = normalizeHomeDoc(c.HomeDoc)
 
 	c.SiteName = strings.TrimSpace(c.SiteName)
 	if c.SiteName == "" {
-		c.SiteName = "DN42 Wiki Go"
+		c.SiteName = "iEdon DN42 Wiki Go"
 	}
 
 	c.Git.BinPath = strings.TrimSpace(c.Git.BinPath)
@@ -155,6 +176,24 @@ func (c *Config) applyDefaults() error {
 		c.Git.Author = "Anonymous <anonymous@localhost>"
 	}
 
+	c.Webhook.Secret = strings.TrimSpace(c.Webhook.Secret)
+	c.Webhook.Polling.CallbackURL = strings.TrimSpace(c.Webhook.Polling.CallbackURL)
+	c.Webhook.Polling.Endpoint = strings.TrimSpace(c.Webhook.Polling.Endpoint)
+	if c.Webhook.Polling.PollingIntervalSec <= 0 {
+		c.Webhook.Polling.PollingIntervalSec = 3600
+	}
+	if c.Webhook.Polling.Enabled {
+		c.Webhook.Polling.interval = time.Duration(c.Webhook.Polling.PollingIntervalSec) * time.Second
+	} else {
+		c.Webhook.Polling.interval = 0
+	}
+
+	repoPath, err := deriveRepositoryPath(c.Git.Remote)
+	if err != nil {
+		return fmt.Errorf("git remote: %w", err)
+	}
+	c.Git.repositoryPath = repoPath
+
 	if err := c.compileTrustedProxies(); err != nil {
 		return err
 	}
@@ -176,6 +215,39 @@ func (c *Config) validate() error {
 	if c.EnableTLS {
 		if c.TLSCert == "" || c.TLSKey == "" {
 			return fmt.Errorf("tls enabled but certificates missing")
+		}
+	}
+	if c.Webhook.Polling.CallbackURL != "" {
+		if _, err := url.ParseRequestURI(c.Webhook.Polling.CallbackURL); err != nil {
+			return fmt.Errorf("invalid webhook callbackUrl: %w", err)
+		}
+	}
+	if c.Webhook.Polling.Endpoint != "" {
+		if _, err := url.ParseRequestURI(c.Webhook.Polling.Endpoint); err != nil {
+			return fmt.Errorf("invalid webhook polling endpoint: %w", err)
+		}
+	}
+	if c.Webhook.Polling.Enabled {
+		if !c.Webhook.Enabled {
+			return fmt.Errorf("webhook polling enabled but webhook API disabled")
+		}
+		if c.Webhook.Secret == "" {
+			return fmt.Errorf("webhook secret required when webhook polling is enabled")
+		}
+		if n := len(c.Webhook.Secret); n < 8 || n > 128 {
+			return fmt.Errorf("webhook secret must be between 8 and 128 characters when polling is enabled")
+		}
+		if c.Webhook.Polling.CallbackURL == "" {
+			return fmt.Errorf("webhook callbackUrl required when webhook polling is enabled")
+		}
+		if c.Webhook.Polling.Endpoint == "" {
+			return fmt.Errorf("webhook polling endpoint required when polling is enabled")
+		}
+		if c.Webhook.Polling.interval <= 0 {
+			return fmt.Errorf("webhook polling interval must be positive")
+		}
+		if c.Git.repositoryPath == "" {
+			return fmt.Errorf("unable to derive repository path from git remote %q", c.Git.Remote)
 		}
 	}
 	return nil
@@ -366,4 +438,40 @@ func (c *Config) remoteAddrChain(r *http.Request) []netip.Addr {
 		chain = append(chain, addr)
 	}
 	return chain
+}
+
+func deriveRepositoryPath(remote string) (string, error) {
+	sanitized := strings.TrimSpace(remote)
+	if sanitized == "" {
+		return "", nil
+	}
+	sanitized = strings.TrimSuffix(sanitized, ".git")
+	if strings.Contains(sanitized, "://") {
+		parsed, err := url.Parse(sanitized)
+		if err != nil {
+			return "", fmt.Errorf("parse remote: %w", err)
+		}
+		return extractRepositoryTail(parsed.Path)
+	}
+	if colon := strings.IndexRune(sanitized, ':'); colon >= 0 && colon < len(sanitized)-1 {
+		return extractRepositoryTail(sanitized[colon+1:])
+	}
+	return extractRepositoryTail(sanitized)
+}
+
+func extractRepositoryTail(pathPart string) (string, error) {
+	trimmed := strings.Trim(pathPart, "/")
+	if trimmed == "" {
+		return "", fmt.Errorf("empty repository path in remote configuration")
+	}
+	segments := strings.Split(trimmed, "/")
+	if len(segments) < 2 {
+		return "", fmt.Errorf("repository path must include owner and name: %q", trimmed)
+	}
+	owner := strings.TrimSpace(segments[len(segments)-2])
+	name := strings.TrimSpace(strings.TrimSuffix(segments[len(segments)-1], ".git"))
+	if owner == "" || name == "" {
+		return "", fmt.Errorf("repository path contains empty owner or name: %q", trimmed)
+	}
+	return owner + "/" + name, nil
 }

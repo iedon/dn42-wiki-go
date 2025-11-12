@@ -39,7 +39,7 @@ func New(cfg *config.Config, svc *site.Service, logger *slog.Logger, serverHeade
 	return srv
 }
 
-// Start launches the HTTP server and optional webhook listener.
+// Start launches the HTTP server and attaches graceful shutdown behaviour.
 
 func (s *Server) Start(ctx context.Context) error {
 	// Build static pages on startup
@@ -75,10 +75,6 @@ func (s *Server) Start(ctx context.Context) error {
 		close(shutdownDone)
 	}()
 
-	if s.cfg.WebhookEnabled {
-		go s.runWebhook(ctx)
-	}
-
 	var serveErr error
 	if s.cfg.EnableTLS {
 		serveErr = server.ServeTLS(listener, s.cfg.TLSCert, s.cfg.TLSKey)
@@ -100,6 +96,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/save", s.handleSave)
 	s.mux.HandleFunc("/api/rename", s.handleRename)
 	s.mux.HandleFunc("/api/preview", s.handlePreview)
+	s.mux.HandleFunc("/api/webhook/pull", s.handleWebhookPull)
+	s.mux.HandleFunc("/api/webhook/push", s.handleWebhookPush)
 	s.mux.HandleFunc("/search-index.json", s.handleSearchIndex)
 	s.mux.HandleFunc("/", s.handlePage)
 }
@@ -173,79 +171,76 @@ func (s *Server) logRequests(next http.Handler) http.Handler {
 	})
 }
 
-func (s *Server) runWebhook(ctx context.Context) {
-	listener, err := s.listen(s.cfg.WebhookListen)
-	if err != nil {
-		s.logger.Error("webhook listen", "error", err)
+func (s *Server) handleWebhookPull(w http.ResponseWriter, r *http.Request) {
+	s.handleWebhook(w, r, "pull")
+}
+
+func (s *Server) handleWebhookPush(w http.ResponseWriter, r *http.Request) {
+	s.handleWebhook(w, r, "push")
+}
+
+func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request, action string) {
+	if !s.cfg.Webhook.Enabled {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+	if !allowWebhookMethod(r.Method) {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if !s.authorizeWebhook(r) {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/webhook/pull", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
-			return
-		}
-		if !s.authorizeWebhook(r) {
-			writeError(w, http.StatusUnauthorized, "unauthorized")
-			return
-		}
-		if err := s.svc.Pull(r.Context()); err != nil {
-			s.logger.Error("webhook pull", "error", err)
-			writeError(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]string{"status": "synced"})
-	})
-	mux.HandleFunc("/webhook/push", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
-			return
-		}
-		if !s.authorizeWebhook(r) {
-			writeError(w, http.StatusUnauthorized, "unauthorized")
-			return
-		}
-		if err := s.svc.Push(r.Context()); err != nil {
-			s.logger.Error("webhook push", "error", err)
-			writeError(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]string{"status": "pushed"})
-	})
+	ctx := r.Context()
+	var (
+		err    error
+		status string
+	)
 
-	srv := &http.Server{Handler: s.withServerHeader(s.logRequests(mux))}
-	go func() {
-		<-ctx.Done()
-		_ = srv.Shutdown(context.Background())
-	}()
+	switch action {
+	case "pull":
+		err = s.svc.Pull(ctx)
+		status = "synced"
+	case "push":
+		err = s.svc.Push(ctx)
+		status = "pushed"
+	default:
+		err = fmt.Errorf("unsupported webhook action: %s", action)
+	}
 
-	if err := srv.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		s.logger.Error("webhook server stopped", "error", err)
+	if err != nil {
+		s.logger.Error("webhook", "action", action, "error", err)
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": status})
+}
+
+func allowWebhookMethod(method string) bool {
+	switch method {
+	case http.MethodGet, http.MethodPost:
+		return true
+	default:
+		return false
 	}
 }
 
 func (s *Server) authorizeWebhook(r *http.Request) bool {
-	secret := s.cfg.WebhookAuthPreShared
+	secret := strings.TrimSpace(s.cfg.Webhook.Secret)
 	if secret == "" {
 		return true
 	}
 
-	header := strings.TrimSpace(r.Header.Get("Authorization"))
-	const prefix = "Bearer "
-	if header == "" || !strings.HasPrefix(header, prefix) {
-		return false
-	}
-
-	token := strings.TrimSpace(header[len(prefix):])
+	token := strings.TrimSpace(r.Header.Get("Authorization"))
 	if token == "" {
 		return false
 	}
-
 	if subtle.ConstantTimeCompare([]byte(token), []byte(secret)) != 1 {
 		return false
 	}
-
 	return true
 }
 

@@ -8,7 +8,7 @@ This project aims to replace the old, Gollum based DN42 distributed wiki.
 - Live mode with automatic pull/push scheduling and Markdown rendering.
 - Offline/static mode that renders the repository into pre-built HTML under `dist/`.
 - Built-in editor (when `editable` is enabled) with commit metadata controls.
-- Optional webhook listener for triggering Git pulls or pushes via POST requests.
+- Webhook API on the primary server plus optional remote polling integration.
 - Themeable layout fragments and asset pipeline bundled from `template/`.
 
 ## Quick Start
@@ -29,10 +29,13 @@ This project aims to replace the old, Gollum based DN42 distributed wiki.
 5. Use `build.sh` for a one-shot build that drops the binary, templates, and example config into `dist/`.
 
 ## Webhook endpoints
-When `webHook` is `true` the process listens on `webHookListen` (default `:8081`) and exposes:
-- `GET /webhook/pull` – triggers `git pull` and cache refresh.
-- `GET /webhook/push` – triggers `git push` if a remote is configured.
-If `webHookAuthPreShared` is non-empty, requests must include `Authorization: Bearer <token>` with a token that matches exactly.
+When `"webhook.enabled": true` the primary HTTP server exposes:
+- `GET|POST /api/webhook/pull` – trigger a `git pull` followed by static cache rebuild.
+- `GET|POST /api/webhook/push` – push local commits to the configured remote.
+
+If `webhook.secret` is non-empty, callers must provide an `Authorization` header whose value matches the secret exactly; bearer tokens (e.g. `Authorization: Bearer <token>`) are accepted for convenience.
+
+Enabling `webhook.polling` keeps a registration active with the remote notification service and invokes the pull endpoint on every successful refresh.
 
 ## Configuration reference
 Configuration is supplied as JSON. Below is a description of every option and the defaults applied when a field is omitted.
@@ -53,10 +56,13 @@ Configuration is supplied as JSON. Below is a description of every option and th
 - `git.commitMessagePrefix` *(string, default empty)*: Optional prefix prepended verbatim to commit messages supplied by users.
 - `git.commitMessageAppendRemoteAddr` *(string, default empty)*: Optional suffix appended when a request carries a remote address. If the value contains `%s` it is treated as a `fmt` format string; otherwise it is concatenated.
 
-### Webhook listener
-- `webHook` *(bool, default `false`)*: Enable the secondary listener for webhook-triggered sync actions.
-- `webHookListen` *(string, default `":8081"`)*: Address used by the webhook HTTP server (same syntax as `listen`).
-- `webHookAuthPreShared` *(string, default empty)*: Pre-shared token for the webhook. When set, requests must present `Authorization: Bearer <token>` with the same value; whitespace is trimmed during load.
+### Webhook
+- `webhook.enabled` *(bool, default `false`)*: Expose webhook endpoints on the main HTTP server.
+- `webhook.secret` *(string, default empty)*: Shared secret expected in the `Authorization` header. Ignored when empty.
+- `webhook.polling.enabled` *(bool, default `false`)*: Keep a registration active with the remote notification service and trigger periodic pulls.
+- `webhook.polling.endpoint` *(string, default empty)*: Base URL of the notification service (the client posts to `<endpoint>/poll`).
+- `webhook.polling.callbackUrl` *(string, default empty)*: Public URL for `/api/webhook/pull`. Required when `webhook.polling.enabled` is `true`.
+- `webhook.polling.pollingIntervalSec` *(int, default `3600`)*: Seconds between refresh attempts. Must be positive when polling is enabled.
 
 ### Paths and templating
 - `outputDir` *(string, default `./dist`)*: Destination directory for static builds or asset exports.

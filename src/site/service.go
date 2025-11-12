@@ -222,7 +222,17 @@ func (s *Service) CanonicalRedirect(requestPath string) (string, bool, bool, err
 	route := routeFromPath(rel, s.homeDoc)
 	canonical := s.pathWithBase(route)
 	alias := route == "/" && info.candidate != ""
-	return canonical, alias, info.original != canonical, nil
+	redirect := info.original != canonical
+	if redirect {
+		exists, err := s.documents.Exists(rel)
+		if err != nil {
+			return "", false, false, fmt.Errorf("check document existence: %w", err)
+		}
+		if !exists {
+			redirect = false
+		}
+	}
+	return canonical, alias, redirect, nil
 }
 
 // BuildStatic renders the entire repository into static HTML assets.

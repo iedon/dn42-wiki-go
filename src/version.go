@@ -11,7 +11,7 @@ const (
 var GIT_COMMIT string
 
 // Server header string
-var SERVER_HEADER = fmt.Sprintf("%s (%s)", SERVER_NAME+"/"+SERVER_VERSION, func() string {
+var SERVER_SIGNATURE = fmt.Sprintf("%s (%s)", SERVER_NAME+"/"+SERVER_VERSION, func() string {
 	if GIT_COMMIT != "" {
 		return GIT_COMMIT
 	}

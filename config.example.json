@@ -11,9 +11,16 @@
     "commitMessagePrefix": "[wiki] ",
     "commitMessageAppendRemoteAddr": " (via %s)"
   },
-  "webHook": true,
-  "webHookListen": ":8081",
-  "webHookAuthPreShared": "",
+  "webhook": {
+    "enabled": true,
+    "secret": "some super secret value",
+    "polling": {
+      "enabled": false,
+      "endpoint": "https://git.dn42/dn42notify/poll",
+      "callbackUrl": "https://dn42.jp/api/webhook/pull",
+      "pollingIntervalSec": 3600
+    }
+  },
   "outputDir": "./dist",
   "templateDir": "./template",
   "homeDoc": "Home.md",
