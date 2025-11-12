@@ -1,14 +1,14 @@
 export function createBackToTopModule(dom, refreshSections) {
-  const button = dom.qs(".back-to-top");
+  const button = dom.qs(".z-back-to-top");
 
   function toggleButton() {
     if (!button) {
       return;
     }
     if (window.scrollY > 200) {
-      button.classList.add("back-to-top--active");
+      button.classList.add("z-back-to-top--active");
     } else {
-      button.classList.remove("back-to-top--active");
+      button.classList.remove("z-back-to-top--active");
     }
   }
 

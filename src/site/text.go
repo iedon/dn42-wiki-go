@@ -37,9 +37,40 @@ func metaDescription(summary, fallback string) string {
 		return ""
 	}
 	text = strings.Join(strings.Fields(text), " ")
+	text = fixPunctuationSpacing(text)
 	runes := []rune(text)
 	if len(runes) <= limit {
 		return text
 	}
-	return string(runes[:limit-1]) + "..."
+	cutoff := min(limit, len(runes))
+	trimmed := strings.TrimSpace(string(runes[:cutoff]))
+	if idx := strings.LastIndex(trimmed, " "); idx > -1 {
+		trimmed = trimmed[:idx]
+	}
+	trimmed = strings.TrimSpace(trimmed)
+	if trimmed == "" {
+		return ""
+	}
+	return trimmed + "..."
+}
+
+func fixPunctuationSpacing(s string) string {
+	replacer := strings.NewReplacer(
+		" ,", ",",
+		" .", ".",
+		" ;", ";",
+		" :", ":",
+		" !", "!",
+		" ?", "?",
+		" %", "%",
+		" )", ")",
+		" ]", "]",
+		" }", "}",
+		" '", "'",
+		" \"", "\"",
+		"( ", "(",
+		"[ ", "[",
+		"{ ", "{",
+	)
+	return replacer.Replace(s)
 }
