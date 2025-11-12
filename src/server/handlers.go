@@ -301,14 +301,6 @@ func isSafeRevision(ref string) bool {
 }
 
 func (s *Server) clientRemoteAddr(r *http.Request) string {
-	if !s.trustForwardHeaders {
-		host, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err == nil && host != "" {
-			return host
-		}
-		return strings.TrimSpace(r.RemoteAddr)
-	}
-
 	addr, chain := s.cfg.RemoteAddrFromRequest(r)
 	if addr.IsValid() {
 		return addr.String()

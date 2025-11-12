@@ -2,6 +2,8 @@
 
 > This document replaces the legacy Gollum/ExaBGP setup notes. It explains how to deploy the Go-based wiki mirror while keeping the original structure for easy comparison.
 
+Thanks to [wiki-ng](https://git.dn42.dev/wiki/wiki-ng), based on their work, [dn42-wiki-go](https://github.com/iedon/dn42-wiki-go) can provide both static site generation and live edit.
+
 ## Overview
 
 `dn42-wiki-go` provides a statically rendered, Git-backed documentation site for dn42. The binary can run in two modes:

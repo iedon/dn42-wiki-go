@@ -21,12 +21,11 @@ import (
 
 // Server ties HTTP handlers to the site service.
 type Server struct {
-	cfg                 *config.Config
-	svc                 *site.Service
-	logger              *slog.Logger
-	mux                 *http.ServeMux
-	trustForwardHeaders bool
-	serverHeader        string
+	cfg          *config.Config
+	svc          *site.Service
+	logger       *slog.Logger
+	mux          *http.ServeMux
+	serverHeader string
 }
 
 // New constructs a server instance.
@@ -34,13 +33,12 @@ func New(cfg *config.Config, svc *site.Service, logger *slog.Logger, serverHeade
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	}
-	srv := &Server{cfg: cfg, svc: svc, logger: logger, mux: http.NewServeMux(), trustForwardHeaders: true, serverHeader: strings.TrimSpace(serverHeader)}
+	srv := &Server{cfg: cfg, svc: svc, logger: logger, mux: http.NewServeMux(), serverHeader: strings.TrimSpace(serverHeader)}
 	srv.routes()
 	return srv
 }
 
 // Start launches the HTTP server and attaches graceful shutdown behaviour.
-
 func (s *Server) Start(ctx context.Context) error {
 	// Build static pages on startup
 	if err := s.svc.BuildStatic(ctx); err != nil {
@@ -50,13 +48,6 @@ func (s *Server) Start(ctx context.Context) error {
 	listener, err := s.listen(s.cfg.Listen)
 	if err != nil {
 		return err
-	}
-	if listener != nil {
-		if addr := listener.Addr(); addr != nil && addr.Network() == "unix" {
-			s.trustForwardHeaders = false
-		} else {
-			s.trustForwardHeaders = true
-		}
 	}
 
 	server := &http.Server{
