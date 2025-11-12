@@ -191,7 +191,7 @@ func (s *Service) pageData(doc page) *templatex.PageData {
 		RequestedPath:    doc.Route,
 		Editable:         s.cfg.Editable,
 		Buttons: templatex.PageButtons{
-			EnableHistory: s.cfg.Editable,
+			EnableHistory: true,
 			EnableRename:  s.cfg.Editable,
 			EnableEdit:    s.cfg.Editable,
 			EnableNew:     s.cfg.Editable,

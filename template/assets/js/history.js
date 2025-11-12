@@ -1,8 +1,4 @@
 export function createHistoryModule({ config: runtime, dom, api: apiClient, helpers: util, modal }) {
-  if (!runtime.editable) {
-    return { init() {}, open() {} };
-  }
-
   const historyModal = dom.qs("#history-modal");
   const historyList = dom.qs("#history-list");
   const historyLoadMore = dom.qs("#history-load-more");
