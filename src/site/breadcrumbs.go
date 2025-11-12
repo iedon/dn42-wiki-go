@@ -15,8 +15,11 @@ func buildBreadcrumbs(route, title, base string) []templatex.Breadcrumb {
 
 	normRoute := strings.Trim(route, "/")
 	if normRoute == "" {
-		crumbs[0].Current = true
-		crumbs[0].Path = ""
+		home := templatex.Breadcrumb{
+			Title:   title,
+			Current: true,
+		}
+		crumbs = append(crumbs, home)
 		return crumbs
 	}
 
