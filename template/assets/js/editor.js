@@ -23,8 +23,11 @@ export function createEditorModule({ config: runtime, dom, api: apiClient, helpe
       openEdit() {},
       openNew() {},
       openRename() {},
+      openDelete() {},
     };
   }
+
+  const ASYNC_NOTICE = "Operation succeeded.\r\nChanges will appear after the background rebuild completes and all nodes have synchronized.";
 
   const editorModal = dom.qs("#editor-modal");
   const editorTitle = dom.qs("#editor-title");
@@ -50,7 +53,10 @@ export function createEditorModule({ config: runtime, dom, api: apiClient, helpe
 
   let editorInitialContent = "";
   let editorSaving = false;
-  let editorMode = "edit";
+
+  function notifyQueued() {
+    window.alert(ASYNC_NOTICE);
+  }
 
   function normalizeContent(value) {
     return typeof value === "string" ? value.replace(/\r\n/g, "\n") : "";
@@ -137,7 +143,6 @@ export function createEditorModule({ config: runtime, dom, api: apiClient, helpe
   }
 
   function setEditorMode(mode) {
-    editorMode = mode;
     const showPreview = mode === "preview";
     editorTabs.forEach((button) => {
       const tab = button.getAttribute("data-tab");
@@ -254,7 +259,7 @@ export function createEditorModule({ config: runtime, dom, api: apiClient, helpe
       util.setHint(editorStatus, "Saved successfully");
       editorInitialContent = currentContent;
       modal.close(editorModal);
-      window.location.href = apiClient.pageUrl(pathValue);
+      notifyQueued();
     } catch (error) {
       util.setHint(editorStatus, error.message, true);
     } finally {
@@ -374,7 +379,8 @@ export function createEditorModule({ config: runtime, dom, api: apiClient, helpe
         }),
       });
       modal.close(pathModal);
-      window.location.href = apiClient.pageUrl(newPath);
+      runtime.pagePath = newPath;
+      notifyQueued();
     } catch (error) {
       util.setHint(pathStatus, error.message, true);
     } finally {
@@ -382,6 +388,35 @@ export function createEditorModule({ config: runtime, dom, api: apiClient, helpe
         pathSubmit.disabled = false;
         pathSubmit.setAttribute("aria-disabled", "false");
       }
+    }
+  }
+
+  async function handleDelete() {
+    const currentPath = runtime.pagePath?.trim();
+    if (!currentPath) {
+      window.alert("Unable to determine the current page path.");
+      return;
+    }
+    const confirmation = window.prompt(
+      "Are you sure want to delete the page?\r\nPlease enter \"DELETE\" to confirm.",
+      ""
+    );
+    if (confirmation === null) {
+      return;
+    }
+    if (confirmation.trim().toUpperCase() !== "DELETE") {
+      window.alert("Deletion cancelled.");
+      return;
+    }
+    try {
+      await apiClient.fetchJSON("/api/delete", {
+        method: "POST",
+        body: JSON.stringify({ path: currentPath }),
+      });
+      notifyQueued();
+      window.location.href = apiClient.pageUrl("") || "/";
+    } catch (error) {
+      window.alert(error.message);
     }
   }
 
@@ -509,5 +544,6 @@ export function createEditorModule({ config: runtime, dom, api: apiClient, helpe
     openEdit: handleEdit,
     openNew: handleNew,
     openRename: handleRename,
+    openDelete: handleDelete,
   };
 }

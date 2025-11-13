@@ -309,7 +309,20 @@ func (r *Repository) CommitChanges(ctx context.Context, paths []string, message 
 	}
 	cmd := r.command(ctx, stageArgs...)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("git add: %w (%s)", err, string(out))
+		outStr := strings.TrimSpace(string(out))
+		if len(sanitized) > 0 && (strings.Contains(outStr, "did not match any files") || strings.Contains(outStr, "pathspec")) {
+			fallback := []string{"add", "--update", "--"}
+			fallback = append(fallback, sanitized...)
+			cmd = r.command(ctx, fallback...)
+			if retryOut, retryErr := cmd.CombinedOutput(); retryErr != nil {
+				return fmt.Errorf("git add: %w (%s)", retryErr, strings.TrimSpace(string(retryOut)))
+			}
+		} else {
+			if outStr == "" {
+				outStr = err.Error()
+			}
+			return fmt.Errorf("git add: %w (%s)", err, outStr)
+		}
 	}
 
 	commitArgs := []string{"commit", "-m", message}

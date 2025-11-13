@@ -17,6 +17,9 @@ export function createToolbarModule({ dom, config: runtime, editor, history }) {
           case "history":
             history.open(button);
             break;
+          case "delete":
+            editor.openDelete(button);
+            break;
           case "home":
             window.location.href = runtime.basePath || "/";
             break;

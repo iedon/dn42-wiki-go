@@ -71,6 +71,7 @@ type PageButtons struct {
 	EnableRename  bool
 	EnableEdit    bool
 	EnableNew     bool
+	EnableDelete  bool
 }
 
 // Breadcrumb models a single breadcrumb entry for navigation.

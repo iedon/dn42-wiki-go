@@ -173,6 +173,48 @@ func (s *Server) handleRename(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "renamed"})
 }
 
+func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if !s.cfg.Editable {
+		writeError(w, http.StatusForbidden, "editing disabled")
+		return
+	}
+	var payload struct {
+		Path string `json:"path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	path := strings.TrimSpace(payload.Path)
+	if path == "" {
+		writeError(w, http.StatusBadRequest, "path required")
+		return
+	}
+	remote := s.clientRemoteAddr(r)
+	if err := s.svc.DeletePage(r.Context(), path, remote); err != nil {
+		switch {
+		case errors.Is(err, site.ErrRepositoryBehind):
+			writeError(w, http.StatusConflict, "remote repository has newer revisions; please reload")
+		case errors.Is(err, site.ErrForbiddenRoute):
+			writeError(w, http.StatusForbidden, "requested path is restricted")
+		case errors.Is(err, site.ErrProtectedDocument):
+			writeError(w, http.StatusBadRequest, err.Error())
+		case errors.Is(err, os.ErrNotExist):
+			writeError(w, http.StatusNotFound, "document not found")
+		case errors.Is(err, site.ErrInvalidPath):
+			writeError(w, http.StatusBadRequest, err.Error())
+		default:
+			writeError(w, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
 func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")

@@ -86,6 +86,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/document", s.handleDocument)
 	s.mux.HandleFunc("/api/save", s.handleSave)
 	s.mux.HandleFunc("/api/rename", s.handleRename)
+	s.mux.HandleFunc("/api/delete", s.handleDelete)
 	s.mux.HandleFunc("/api/preview", s.handlePreview)
 	s.mux.HandleFunc("/api/webhook/pull", s.handleWebhookPull)
 	s.mux.HandleFunc("/api/webhook/push", s.handleWebhookPush)

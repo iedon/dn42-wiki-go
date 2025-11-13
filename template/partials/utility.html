@@ -5,12 +5,17 @@
         <div id="search-results" class="search-results hidden" role="listbox" aria-label="Search results"></div>
     </div>
     <div class="toolbar" role="toolbar" aria-label="Page actions">
-        <button data-action="home" type="button">Home</button>
-        {{ if .Buttons.EnableHistory }}<button data-action="history" type="button">History</button>{{ end }}
+        <div class="toolbar-group" role="group" aria-label="Navigation">
+            <button data-action="home" type="button">Home</button>
+            {{ if .Buttons.EnableHistory }}<button data-action="history" type="button">History</button>{{ end }}
+        </div>
         {{ if .Editable }}
+        <div class="toolbar-group" role="group" aria-label="Editing">
+            {{ if .Buttons.EnableDelete }}<button data-action="delete" type="button" class="button-secondary">Delete</button>{{ end }}
             {{ if .Buttons.EnableRename }}<button data-action="rename" type="button">Rename</button>{{ end }}
             {{ if .Buttons.EnableEdit }}<button data-action="edit" type="button">Edit</button>{{ end }}
-            {{ if .Buttons.EnableNew }}<button data-action="new" type="button">New</button>{{ end }}
+            {{ if .Buttons.EnableNew }}<button data-action="new" type="button" class="button-primary">New</button>{{ end }}
+        </div>
         {{ end }}
     </div>
 </div>

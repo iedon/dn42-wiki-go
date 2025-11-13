@@ -42,6 +42,26 @@ func (d *DocumentStore) Write(relPath string, content []byte) error {
 	return d.repo.WriteFile(relPath, content)
 }
 
+func (d *DocumentStore) Delete(relPath string) error {
+	full := filepath.Join(d.repo.Dir, filepath.FromSlash(relPath))
+	if err := os.Remove(full); err != nil {
+		return err
+	}
+	dir := filepath.Dir(full)
+	repoDir := filepath.Clean(d.repo.Dir)
+	for dir != repoDir && dir != "." {
+		entries, err := os.ReadDir(dir)
+		if err != nil || len(entries) > 0 {
+			break
+		}
+		if remErr := os.Remove(dir); remErr != nil {
+			break
+		}
+		dir = filepath.Dir(dir)
+	}
+	return nil
+}
+
 func (d *DocumentStore) RenderDocument(ctx context.Context, relPath string) (page, error) {
 	data, err := d.repo.ReadFile(relPath)
 	if err != nil {

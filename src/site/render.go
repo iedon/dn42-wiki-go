@@ -213,6 +213,7 @@ func (s *Service) pageData(doc page) *templatex.PageData {
 			EnableRename:  s.cfg.Editable,
 			EnableEdit:    s.cfg.Editable,
 			EnableNew:     s.cfg.Editable,
+			EnableDelete:  s.cfg.Editable,
 		},
 		SearchIndexURL:  s.searchIndexPath(),
 		Live:            s.cfg.Live,

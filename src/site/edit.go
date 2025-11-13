@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -48,10 +49,11 @@ func (s *Service) SavePage(ctx context.Context, relPath string, content []byte, 
 	if err := s.documents.Commit(ctx, []string{rel}, finalMessage, finalAuthor); err != nil {
 		return err
 	}
-	if err := s.BuildStatic(ctx); err != nil {
-		return fmt.Errorf("build static: %w", err)
+	if err := s.finalizeCommit(ctx); err != nil {
+		return err
 	}
-	return s.finalizeCommit(ctx)
+	s.triggerRebuild()
+	return nil
 }
 
 // RenamePage moves a document and commits the rename.
@@ -94,23 +96,7 @@ func (s *Service) RenamePage(ctx context.Context, oldPath, newPath, remoteAddr s
 		return err
 	}
 
-	homeDoc := s.homeDoc
-	homeDisplay := strings.TrimSuffix(filepath.ToSlash(homeDoc), filepath.Ext(homeDoc))
-	if homeDisplay == "" {
-		homeDisplay = "Home"
-	}
-
-	format := func(rel string) string {
-		cleaned := filepath.ToSlash(rel)
-		cleaned = strings.TrimSuffix(cleaned, filepath.Ext(cleaned))
-		cleaned = strings.TrimPrefix(cleaned, "/")
-		if cleaned == "" {
-			return homeDisplay
-		}
-		return cleaned
-	}
-
-	message := fmt.Sprintf("Rename page: `%s` to `%s`", format(oldRel), format(newRel))
+	message := fmt.Sprintf("Rename page: `%s` to `%s`", s.commitLabel(oldRel), s.commitLabel(newRel))
 	finalMessage, err := s.composeCommitMessage(message, remoteAddr)
 	if err != nil {
 		return err
@@ -118,10 +104,62 @@ func (s *Service) RenamePage(ctx context.Context, oldPath, newPath, remoteAddr s
 	if err := s.documents.Commit(ctx, []string{newRel}, finalMessage, s.composeCommitAuthor("")); err != nil {
 		return err
 	}
-	if err := s.BuildStatic(ctx); err != nil {
-		return fmt.Errorf("build static: %w", err)
+	if err := s.finalizeCommit(ctx); err != nil {
+		return err
 	}
-	return s.finalizeCommit(ctx)
+	s.triggerRebuild()
+	return nil
+}
+
+// DeletePage removes a document and commits the deletion.
+func (s *Service) DeletePage(ctx context.Context, relPath, remoteAddr string) error {
+	if !s.cfg.Editable {
+		return fmt.Errorf("editing disabled")
+	}
+
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+
+	if err := s.ensureRepositoryFresh(ctx); err != nil {
+		return err
+	}
+
+	rel, err := normalizeRelPath(relPath, s.homeDoc)
+	if err != nil {
+		return err
+	}
+	if err := s.ensureRouteAccessible(rel); err != nil {
+		return err
+	}
+	if strings.EqualFold(rel, s.homeDoc) {
+		return ErrProtectedDocument
+	}
+	exists, err := s.documents.Exists(rel)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return os.ErrNotExist
+	}
+	if err := s.documents.Delete(rel); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return os.ErrNotExist
+		}
+		return err
+	}
+	message := fmt.Sprintf("Delete page: `%s`", s.commitLabel(rel))
+	finalMessage, err := s.composeCommitMessage(message, remoteAddr)
+	if err != nil {
+		return err
+	}
+	if err := s.documents.Commit(ctx, []string{rel}, finalMessage, s.composeCommitAuthor("")); err != nil {
+		return err
+	}
+	if err := s.finalizeCommit(ctx); err != nil {
+		return err
+	}
+	s.triggerRebuild()
+	return nil
 }
 
 // History returns commit metadata for the provided path.
@@ -158,6 +196,21 @@ func (s *Service) LoadRaw(relPath string) ([]byte, error) {
 		return nil, err
 	}
 	return s.documents.Read(rel)
+}
+
+func (s *Service) commitLabel(rel string) string {
+	cleaned := filepath.ToSlash(strings.TrimSpace(rel))
+	cleaned = strings.TrimSuffix(cleaned, filepath.Ext(cleaned))
+	cleaned = strings.TrimPrefix(cleaned, "/")
+	if cleaned != "" {
+		return cleaned
+	}
+	home := filepath.ToSlash(s.homeDoc)
+	home = strings.TrimSuffix(home, filepath.Ext(home))
+	if strings.TrimSpace(home) == "" {
+		return "Home"
+	}
+	return home
 }
 
 func (s *Service) composeCommitMessage(raw, remote string) (string, error) {

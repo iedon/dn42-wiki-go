@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -33,7 +34,10 @@ type Service struct {
 	layout    *LayoutCache
 	search    *SearchCatalog
 
-	writeMu sync.Mutex
+	writeMu     sync.Mutex
+	buildMu     sync.Mutex
+	rebuildOnce sync.Once
+	rebuildCh   chan struct{}
 }
 type requestAnalysis struct {
 	original      string
@@ -370,6 +374,27 @@ func (s *Service) SearchIndex() json.RawMessage {
 		return append(json.RawMessage(nil), emptySearchIndexJSON...)
 	}
 	return payload
+}
+
+func (s *Service) triggerRebuild() {
+	s.rebuildOnce.Do(func() {
+		s.rebuildCh = make(chan struct{}, 1)
+		go s.rebuildWorker()
+	})
+	select {
+	case s.rebuildCh <- struct{}{}:
+	default:
+	}
+}
+
+func (s *Service) rebuildWorker() {
+	for range s.rebuildCh {
+		s.buildMu.Lock()
+		if err := s.BuildStatic(context.Background()); err != nil {
+			log.Printf("build static: %v", err)
+		}
+		s.buildMu.Unlock()
+	}
 }
 
 // Pull synchronizes the repository and refreshes caches.
