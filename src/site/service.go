@@ -334,6 +334,10 @@ func (s *Service) BuildStatic(ctx context.Context) error {
 		return err
 	}
 
+	if err := os.Chmod(tempDir, 0o755); err != nil {
+		return fmt.Errorf("set temp output permissions: %w", err)
+	}
+
 	if err := os.MkdirAll(parent, 0o755); err != nil {
 		return fmt.Errorf("ensure output parent: %w", err)
 	}
@@ -350,6 +354,11 @@ func (s *Service) BuildStatic(ctx context.Context) error {
 	if err := os.Rename(tempDir, finalDir); err != nil {
 		_ = os.Rename(backupDir, finalDir)
 		return fmt.Errorf("activate new output: %w", err)
+	}
+	if err := os.Chmod(finalDir, 0o755); err != nil {
+		_ = os.RemoveAll(finalDir)
+		_ = os.Rename(backupDir, finalDir)
+		return fmt.Errorf("set final output permissions: %w", err)
 	}
 
 	_ = os.RemoveAll(backupDir)

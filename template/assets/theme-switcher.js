@@ -4,7 +4,7 @@ if (theme === null && window.matchMedia) {
     if (window.matchMedia("(prefers-color-scheme: light)").matches) {
         theme = "light";
     }
-    
+
     window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", e => {
         if (window.localStorage.getItem("theme") !== null) return;
 
@@ -35,6 +35,3 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 });
-
-
-

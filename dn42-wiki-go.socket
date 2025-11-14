@@ -6,8 +6,8 @@ PartOf=dn42-wiki-go.service
 Accept=no
 NoDelay=true
 ListenStream=/run/dn42-wiki-go.sock
-SocketGroup=www-data
-SocketMode=0660
+SocketGroup=dn42-wiki-go
+SocketMode=0666
 
 [Install]
 WantedBy=sockets.target
