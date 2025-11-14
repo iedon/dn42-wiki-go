@@ -1,53 +1,96 @@
 # DN42 Wiki Go
 
-DN42 Wiki Go is a simple Git-backed wiki engine, designed for DN42, that serves Markdown content with a Go HTTP frontend or produces a fully static export. It keeps everything in a Git repository, supports optional in-browser editing, and can operate without an upstream remote for disconnected nodes.
+[dn42-wiki-go](https://github.com/iedon/dn42-wiki-go) is a lightweight, Git-backed wiki engine designed for DN42. It is based on [wiki-ng](https://git.dn42.dev/wiki/wiki-ng), aims to replace the old Gollum-based DN42 distributed wiki.
 
-This project aims to replace the old, Gollum based DN42 distributed wiki.
+It can serve pages live through its built-in Go HTTP server or generate a fully static HTML export for external hosting. All content is stored in a Git repository, making it easy to replicate across nodes or run in disconnected environments.
+
+## Operating Modes
+
+You can run `dn42-wiki-go` in three different ways:
+
+1. **Run static build once then exit (`--build` or `live=false`)**  
+   The App renders all Markdown files into HTML under outputDir and exits.  
+   Best for setups where your own cron job handles Git sync and file publishing.
+
+2. **Live mode without reverse proxy (`live=true`)**  
+   The built-in HTTP server directly serves pages, assets, and APIs.  
+   Suitable for simple deployments.
+
+3. **Live mode behind a reverse proxy**  
+   The reverse proxy (nginx, Caddy, HAProxy, etc.) serves the generated files, and only API endpoints are forwarded to the App.  
+   See `config.example.json` for example configs and `nginx-vhost.conf` for a reverse-proxy reference.
+
+   **Recommended for production and anycast nodes**.
 
 ## Features
-- Live mode with automatic pull/push scheduling and Markdown rendering.
-- Offline/static mode that renders the repository into pre-built HTML under `dist/`.
-- Built-in editor (when `editable` is enabled) with commit metadata controls.
-- Webhook API on the primary server plus optional remote polling integration.
-- Themeable layout fragments and asset pipeline bundled from `template/`.
+
+- Live mode with automatic Markdown rendering and scheduled Git pull/push.
+- Static mode for fully pre-built HTML exports.
+- Optional in-browser editor with commit metadata (author, message prefix, remote IP).
+- Webhook endpoints for remote pull/push triggers and optional polling integration(see `dn42notifyd`).
+- Themeable templates and bundled UI assets.
+- Designed for distributed, multi-node and anycast environments.
 
 ## Quick Start
-1. Install Go 1.24+ and ensure the Git CLI is available on `PATH`.
-2. Copy `config.example.json` to `config.json` and adjust the settings you need.
-3. Run the server in live mode(eg. Linux amd64):
+
+Pre-built binaries are available in the [GitHub releases](https://github.com/iedon/dn42-wiki-go/releases).
+
+Please do not forget to clone the repository to copy `config.example.json` and the `template` folder. They should be put together in the same production directory.
+
+### Manual Build
+
+1. Install Go 1.24+ and ensure the git executable is available in PATH.
+2. Copy the example config:
+   cp config.example.json config.json
+   Then edit the settings you need.
+3. Build for your platform (example: Linux amd64):
    ```bash
    export GOOS=linux
    export GOARCH=amd64
    ./build.sh
    ```
-4. For a static export instead, set `"live": false` in the config and run the binary, or run with `--build` flag; rendered HTML will appear in `outputDir` (default `./dist`):
-   ```bash
-   # Use CLI to generate site
-   # The flag will force treating config.live as false
-   ./dn42-wiki-go --build
-   ```
-5. Use `build.sh` for a one-shot build that drops the binary, templates, and example config into `dist/`.
 
-For production roll-outs (systemd, reverse proxies, anycast routing, containers), see [`DEPLOYMENT.md`](DEPLOYMENT.md).
+## Webhook Endpoints
 
-## Webhook endpoints
-When `"webhook.enabled": true` the primary HTTP server exposes:
-- `GET|POST /api/webhook/pull` – trigger a `git pull` followed by static cache rebuild.
-- `GET|POST /api/webhook/push` – push local commits to the configured remote.
+When `webhook.enabled` = true, the server exposes:
 
-If `webhook.secret` is non-empty, callers must provide an `Authorization` header whose value matches the secret exactly; bearer tokens (e.g. `Authorization: Bearer <token>`) are accepted for convenience.
+- GET | POST /api/webhook/pull  
+  Runs git pull and rebuilds the cached HTML.
 
-Enabling `webhook.polling` keeps a registration active with the remote notification service and invokes the pull endpoint on every successful refresh.
+- GET | POST /api/webhook/push  
+  Pushes local commits to the remote.
 
-## Configuration reference
-Configuration is supplied as JSON. Below is a description of every option and the defaults applied when a field is omitted.
+If `webhook.secret` is set, requests must include an Authorization header that matches the secret.  
+
+### Polling Integration
+
+When `webhook.polling.enabled` = true, the server registers with a remote notify service and triggers `/api/webhook/pull` whenever a refresh completes.
+
+This is compatible with `dn42notifyd` and similar tools.
+
+## Configuration Reference
+
+All settings are provided through a JSON file. Below is a concise reference of all options.
 
 ### Runtime
-- `live` *(bool, default `false`)*: Run the HTTP server when `true`; render static content to `outputDir` and exit when `false`.
-- `editable` *(bool, default `false`)*: Allow write endpoints (save, rename, new page). When `false` the UI becomes read-only.
-- `listen` *(string, default `":8080"`)*: Address for the main HTTP server. Supports TCP (`host:port`) or `unix:/path`.
-- `baseUrl` *(string, default empty)*: Optional URL prefix for hosting under a subdirectory. Used in generated links and search index URLs.
-- `siteName` *(string, default `"DN42 Wiki Go"`)*: Site Name.
+
+- `live` *(bool, default `false`)*:  
+  true -> run HTTP server and render on demand.  
+  false -> render once to outputDir and exit.
+
+- `editable` *(bool, default `false`)*:  
+  Enables in-browser editing and write operations.
+
+- `listen` *(string, default `":8080"`)*:  
+  TCP address (host:port) or UNIX socket (unix:/path).
+
+  Advanced: See example systemd files `dn42-wiki-go.socket` and `dn42-wiki-go.service` in the repository.
+
+- `baseUrl` *(string, optional)*:  
+  URL prefix when hosting under a subdirectory.
+
+- `siteName` *(string, default `"DN42 Wiki Go"`)*:  
+  Display name of the wiki.
 
 ### Git
 - `git.binPath` *(string, default `git`)*: Path to the Git executable.
@@ -88,9 +131,8 @@ Configuration is supplied as JSON. Below is a description of every option and th
 - `trustedProxies` *(array of strings, default empty)*: CIDR blocks or literal IPs that are trusted to populate `X-Forwarded-For`.
 - `trustedRemoteAddrLevel` *(int, default `1`)*: Number of additional trusted hops to peel off when deriving the end-user IP from the forwarded chain. Values less than `1` are coerced to `1` during load.
 
-## Development notes
-- Running with `live: true` requires write access to the Git repository directory so edits can be committed.
-- When `git.remote` is empty the application initialises a standalone repository and skips pull/push work.
-- Template assets are copied into the static build; editing them requires rebuilding or re-running the server to refresh caches.
+## Notes
 
-Refer to `config.example.json` for starter setups, and see `nginx-vhost.conf` for a sample reverse-proxy configuration.
+- live = true requires write access to the Git repo for local commits.
+- With no remote configured, `dn42-wiki-go` initializes a local-only repository.
+- Template changes require restarting the server or rebuilding static output.
