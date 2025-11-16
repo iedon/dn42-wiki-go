@@ -4,6 +4,12 @@
 
 It can serve pages live through its built-in Go HTTP server or generate a fully static HTML export for external hosting. All content is stored in a Git repository, making it easy to replicate across nodes or run in disconnected environments.
 
+## Live Version
+- [https://wiki.dn42/](https://wiki.dn42/) (DN42 Access)
+- [https://dn42.jp/](https://dn42.jp/) (Clearnet)
+
+![Screenshot of DN42 Wiki Go](./screenshot.png)
+
 ## Operating Modes
 
 You can run `dn42-wiki-go` in three different ways:

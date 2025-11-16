@@ -3,9 +3,11 @@ package renderer
 import (
 	"bytes"
 	"fmt"
+	"slices"
 	"strings"
 
 	chromahtml "github.com/alecthomas/chroma/v2/formatters/html"
+	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/yuin/goldmark"
 	highlighting "github.com/yuin/goldmark-highlighting/v2"
 	meta "github.com/yuin/goldmark-meta"
@@ -34,6 +36,17 @@ type RenderResult struct {
 // Renderer transforms markdown sources into HTML fragments.
 type Renderer struct {
 	md goldmark.Markdown
+}
+
+func init() {
+	if nginxConfStyling := lexers.Get("nginx.conf"); nginxConfStyling != nil {
+		cfg := nginxConfStyling.Config()
+		hasAlias := slices.Contains(cfg.Aliases, "conf")
+		if !hasAlias {
+			cfg.Aliases = append(cfg.Aliases, "conf")
+			lexers.Register(nginxConfStyling)
+		}
+	}
 }
 
 // New constructs a renderer with GitHub-flavored markdown extensions and syntax highlighting.
@@ -174,6 +187,9 @@ func slugify(input string) string {
 	if slug == "" {
 		return "section"
 	}
+	if slug[0] < 'a' || slug[0] > 'z' {
+		slug = "section-" + slug
+	}
 	return slug
 }
 
@@ -184,8 +200,10 @@ func codeWrapper(w util.BufWriter, ctx highlighting.CodeBlockContext, entering b
 	}
 	lang = string(util.EscapeHTML([]byte(lang)))
 	if entering {
+		_, _ = fmt.Fprintf(w, `<div class="code-block" data-lang="%[1]s">`, lang)
+		_, _ = fmt.Fprintf(w, `<span class="code-lang-label" aria-hidden="true">%[1]s</span>`, lang)
 		_, _ = fmt.Fprintf(w, `<pre tabindex="0" class="z-chroma z-code language-%[1]s" data-lang="%[1]s"><code class="language-%[1]s" data-lang="%[1]s">`, lang)
 		return
 	}
-	_, _ = w.WriteString("</code></pre>\n")
+	_, _ = w.WriteString("</code></pre></div>\n")
 }

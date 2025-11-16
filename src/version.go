@@ -4,7 +4,7 @@ import "fmt"
 
 const (
 	SERVER_NAME    = "iEdon-DN42-Wiki-Go"
-	SERVER_VERSION = "1.1.2"
+	SERVER_VERSION = "1.1.3"
 )
 
 // Set at link stage via `-ldflags "-X main.GIT_COMMIT=$(git rev-parse --short HEAD)"`

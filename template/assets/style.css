@@ -186,24 +186,6 @@ pre {
   background-color: var(--background);
 }
 
-pre::-webkit-scrollbar {
-  background: transparent;
-  height: 0.5em;
-}
-
-pre::-webkit-scrollbar-thumb {
-  background: #6e7073;
-  border-radius: 0.3em;
-}
-
-pre::-webkit-scrollbar-thumb:hover {
-  background: #b1ff62;
-}
-
-pre::-webkit-scrollbar-thumb:active {
-  background: #ff7d6a;
-}
-
 pre > code {
   font-family: "Spline Sans Mono", monospace;
   font-size: 1rem;
@@ -846,7 +828,7 @@ body.light .search-hit:focus {
 }
 
 .modal.modal--diff {
-  width: min(1100px, 96vw);
+  width: min(85%, 96vw);
   max-height: 92vh;
   z-index: 120;
 }
@@ -939,9 +921,10 @@ body.light .search-hit:focus {
 }
 
 .modal-body {
-  padding: 1rem 1.5rem;
+  padding: 0.5rem;
   overflow-y: auto;
   flex: 1 1 auto;
+  margin: 0.5rem;
 }
 
 .icon-button {
@@ -1351,10 +1334,6 @@ body.light .z-back-to-top {
   padding: 0.15rem 0;
   list-style: none;
   font-weight: 600;
-}
-
-.directory-branch > summary::-webkit-details-marker {
-  display: none;
 }
 
 .directory-branch > summary::before {

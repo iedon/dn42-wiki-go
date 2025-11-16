@@ -38,29 +38,22 @@ body.light {
     --blue-2: #55b4d4;
 }
 
-pre.z-code,
-pre.z-chroma {
-    background-color: var(--background);
-    color: var(--gray);
-    border-radius: 0.5em;
-    padding: 0.75em 1em;
-}
-
-pre.z-code[data-lang],
-pre.z-chroma[data-lang] {
+.code-block {
     position: relative;
+    margin: 0;
 }
 
-pre.z-code[data-lang]::before,
-pre.z-chroma[data-lang]::before {
-    content: attr(data-lang);
+.code-block pre {
+    margin: 0;
+}
+
+.code-block .code-lang-label {
     position: absolute;
     top: 0.4rem;
     right: 0.75rem;
     z-index: 1;
     pointer-events: none;
     font-size: 0.75rem;
-    font-weight: 600;
     letter-spacing: 0.05em;
     text-transform: uppercase;
     padding: 0.1rem 0.5rem;
@@ -69,15 +62,22 @@ pre.z-chroma[data-lang]::before {
     border-radius: 0.4rem;
 }
 
-body.light pre.z-code[data-lang]::before,
-body.light pre.z-chroma[data-lang]::before {
+body.light .code-block .code-lang-label {
     background: rgba(0, 0, 0, 0.08);
+}
+
+pre.z-code,
+pre.z-chroma {
+    background-color: var(--background);
+    color: var(--gray);
+    border-radius: 0.5em;
+    padding: 0.75em 1em;
+    overflow: auto;
 }
 
 pre.z-code code,
 pre.z-chroma code {
     display: block;
-    overflow-x: auto;
     font-family: 'Spline Sans Mono', monospace;
     font-size: 0.95rem;
 }
