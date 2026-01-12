@@ -81,9 +81,6 @@ func (p *Poller) execute(ctx context.Context) {
 		p.logger.Warn("webhook poll", "error", err)
 		return
 	}
-	if err := p.svc.Pull(ctx); err != nil {
-		p.logger.Warn("webhook poll pull", "error", err)
-	}
 }
 
 func (p *Poller) refreshRegistration(ctx context.Context) error {

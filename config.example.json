@@ -6,7 +6,7 @@
     "binPath": "git",
     "remote": "https://git.dn42.dev/wiki/wiki",
     "localDirectory": "./wiki",
-    "pullIntervalSec": 300,
+    "pullIntervalSec": 3600,
     "author": "Anonymous <anonymous@localhost>",
     "commitMessagePrefix": "[wiki] ",
     "commitMessageAppendRemoteAddr": " (via %s)",
@@ -14,7 +14,7 @@
   },
   "webhook": {
     "enabled": true,
-    "secret": "some super secret value",
+    "secret": "",
     "polling": {
       "enabled": false,
       "endpoint": "https://git.dn42/dn42notify/poll",

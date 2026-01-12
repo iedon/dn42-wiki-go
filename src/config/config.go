@@ -1,6 +1,8 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -166,7 +168,7 @@ func (c *Config) applyDefaults() error {
 		c.Git.LocalDirectory = "./repo"
 	}
 	if c.Git.PullIntervalSec <= 0 {
-		c.Git.PullIntervalSec = 300
+		c.Git.PullIntervalSec = 3600
 	}
 	if c.LogLevel == "" {
 		c.LogLevel = "info"
@@ -181,6 +183,15 @@ func (c *Config) applyDefaults() error {
 	}
 
 	c.Webhook.Secret = strings.TrimSpace(c.Webhook.Secret)
+	if c.Webhook.Secret == "" {
+		// Generate 16 random bytes (32 hex characters)
+		b := make([]byte, 16)
+		if _, err := rand.Read(b); err != nil {
+			return fmt.Errorf("generate webhook secret: %w", err)
+		}
+		c.Webhook.Secret = hex.EncodeToString(b)
+	}
+
 	c.Webhook.Polling.CallbackURL = strings.TrimSpace(c.Webhook.Polling.CallbackURL)
 	c.Webhook.Polling.Endpoint = strings.TrimSpace(c.Webhook.Polling.Endpoint)
 	if c.Webhook.Polling.PollingIntervalSec <= 0 {
@@ -235,9 +246,6 @@ func (c *Config) validate() error {
 		c.Webhook.Polling.Enabled = false
 	}
 	if c.Webhook.Polling.Enabled {
-		if c.Webhook.Secret == "" {
-			return fmt.Errorf("webhook secret required when webhook polling is enabled")
-		}
 		if n := len(c.Webhook.Secret); n < 8 || n > 128 {
 			return fmt.Errorf("webhook secret must be between 8 and 128 characters when polling is enabled")
 		}
