@@ -186,6 +186,9 @@ export function createEditorModule({ config: runtime, dom, api: apiClient, helpe
         body: JSON.stringify({ content: editorInput.value }),
       });
       editorPreview.innerHTML = data.html || "<p>No preview available</p>";
+      editorPreview.querySelectorAll("a").forEach((link) => {
+        link.setAttribute("target", "_blank");
+      });
     } catch (error) {
       editorPreview.innerHTML = `<p class="form-hint error">${error.message}</p>`;
     }
@@ -498,10 +501,35 @@ export function createEditorModule({ config: runtime, dom, api: apiClient, helpe
     }
   }
 
+  function handleBeforeUnload(event) {
+    const currentContent = normalizeContent(editorInput.value);
+    if (currentContent !== editorInitialContent) {
+      event.preventDefault();
+    }
+  }
+
   function init() {
     if (!editorModal) {
       return;
     }
+
+    editorModal.addEventListener("modal:open", () => {
+      window.addEventListener("beforeunload", handleBeforeUnload);
+    });
+
+    editorModal.addEventListener("modal:close", () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    });
+
+    editorModal.addEventListener("modal:before-close", (event) => {
+      const currentContent = normalizeContent(editorInput.value);
+      if (currentContent !== editorInitialContent) {
+        if (!window.confirm("You have unsaved changes. Are you sure you want to close?")) {
+          event.preventDefault();
+        }
+      }
+    });
+
     if (editorTabs.length) {
       editorTabs.forEach((button) => {
         button.addEventListener("click", () => {

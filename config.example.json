@@ -9,7 +9,8 @@
     "pullIntervalSec": 300,
     "author": "Anonymous <anonymous@localhost>",
     "commitMessagePrefix": "[wiki] ",
-    "commitMessageAppendRemoteAddr": " (via %s)"
+    "commitMessageAppendRemoteAddr": " (via %s)",
+    "commandTimeoutSec": 120
   },
   "webhook": {
     "enabled": true,

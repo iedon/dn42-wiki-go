@@ -24,6 +24,7 @@ type GitConfig struct {
 	Author                        string `json:"author"`
 	CommitMessagePrefix           string `json:"commitMessagePrefix"`
 	CommitMessageAppendRemoteAddr string `json:"commitMessageAppendRemoteAddr"`
+	CommandTimeoutSec             int    `json:"commandTimeoutSec"`
 	repositoryPath                string `json:"-"`
 }
 
@@ -80,6 +81,7 @@ func (g *GitConfig) UnmarshalJSON(data []byte) error {
 		Author                        string `json:"author"`
 		CommitMessagePrefix           string `json:"commitMessagePrefix"`
 		CommitMessageAppendRemoteAddr string `json:"commitMessageAppendRemoteAddr"`
+		CommandTimeoutSec             int    `json:"commandTimeoutSec"`
 	}
 
 	var raw rawGitConfig
@@ -94,6 +96,7 @@ func (g *GitConfig) UnmarshalJSON(data []byte) error {
 	g.Author = raw.Author
 	g.CommitMessagePrefix = raw.CommitMessagePrefix
 	g.CommitMessageAppendRemoteAddr = raw.CommitMessageAppendRemoteAddr
+	g.CommandTimeoutSec = raw.CommandTimeoutSec
 	return nil
 }
 
@@ -228,10 +231,10 @@ func (c *Config) validate() error {
 			return fmt.Errorf("invalid webhook polling endpoint: %w", err)
 		}
 	}
+	if !c.Webhook.Enabled {
+		c.Webhook.Polling.Enabled = false
+	}
 	if c.Webhook.Polling.Enabled {
-		if !c.Webhook.Enabled {
-			return fmt.Errorf("webhook polling enabled but webhook API disabled")
-		}
 		if c.Webhook.Secret == "" {
 			return fmt.Errorf("webhook secret required when webhook polling is enabled")
 		}

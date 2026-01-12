@@ -150,7 +150,7 @@ func extractText(root ast.Node, source []byte) string {
 	return strings.TrimSpace(sb.String())
 }
 
-func attributeToString(value interface{}) string {
+func attributeToString(value any) string {
 	switch v := value.(type) {
 	case []byte:
 		return string(v)

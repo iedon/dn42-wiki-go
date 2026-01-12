@@ -11,4 +11,5 @@ services:
       - ./data/dist:/app/dist
       - ./data/repo:/app/repo
     restart: always
+    init: true
     command: ["--config", "/app/config.json"]

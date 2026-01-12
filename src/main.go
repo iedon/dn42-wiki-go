@@ -35,7 +35,7 @@ func main() {
 	logger := newLogger(cfg.LogLevel)
 	logger.Info("starting", "live", cfg.Live)
 
-	repo, err := gitutil.NewRepository(cfg.Git.BinPath, cfg.Git.Remote, cfg.Git.LocalDirectory)
+	repo, err := gitutil.NewRepository(cfg.Git.BinPath, cfg.Git.Remote, cfg.Git.LocalDirectory, time.Duration(cfg.Git.CommandTimeoutSec)*time.Second)
 	if err != nil {
 		logger.Error("repository", "error", err)
 		os.Exit(1)

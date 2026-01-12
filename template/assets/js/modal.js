@@ -78,6 +78,18 @@ export function createModalManager(domUtils) {
     if (!modal) {
       return;
     }
+
+    // Allow listeners to cancel the close operation
+    const event = new CustomEvent("modal:before-close", {
+      bubbles: true,
+      cancelable: true,
+      detail: { modal },
+    });
+    modal.dispatchEvent(event);
+    if (event.defaultPrevented) {
+      return;
+    }
+
     const index = stack.lastIndexOf(modal);
     if (index !== -1) {
       stack.splice(index, 1);

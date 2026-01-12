@@ -14,20 +14,18 @@ import (
 	"time"
 )
 
-// CommandTimeout bounds synchronous git invocations.
-const CommandTimeout = 120 * time.Second
+// Repository represents a cloned git repository and offers limited VCS operations.
+type Repository struct {
+	Dir            string
+	Remote         string
+	GitPath        string
+	CommandTimeout time.Duration
+	mu             sync.Mutex
+}
 
 // ErrRemoteAhead indicates the upstream repository contains commits the
 // local clone has not incorporated yet.
 var ErrRemoteAhead = errors.New("remote contains newer commits")
-
-// Repository represents a cloned git repository and offers limited VCS operations.
-type Repository struct {
-	Dir     string
-	Remote  string
-	GitPath string
-	mu      sync.Mutex
-}
 
 // Commit encapsulates log metadata for UI consumption.
 type Commit struct {
@@ -39,8 +37,11 @@ type Commit struct {
 }
 
 // NewRepository ensures the repository exists locally by cloning if needed.
-func NewRepository(gitPath, remote, dir string) (*Repository, error) {
-	repo := &Repository{Dir: dir, Remote: remote, GitPath: gitPath}
+func NewRepository(gitPath, remote, dir string, timeout time.Duration) (*Repository, error) {
+	if timeout <= 0 {
+		timeout = 120 * time.Second
+	}
+	repo := &Repository{Dir: dir, Remote: remote, GitPath: gitPath, CommandTimeout: timeout}
 	if err := repo.ensureClone(); err != nil {
 		return nil, err
 	}
@@ -53,7 +54,7 @@ func (r *Repository) Pull(ctx context.Context) (bool, error) {
 		return false, nil
 	}
 
-	ctx, cancel := ensureContext(ctx)
+	ctx, cancel := r.ensureContext(ctx)
 	defer cancel()
 
 	r.mu.Lock()
@@ -105,7 +106,7 @@ func (r *Repository) RemoteAhead(ctx context.Context) (bool, error) {
 		return false, nil
 	}
 
-	ctx, cancel := ensureContext(ctx)
+	ctx, cancel := r.ensureContext(ctx)
 	defer cancel()
 
 	r.mu.Lock()
@@ -168,7 +169,7 @@ func (r *Repository) PullPath(ctx context.Context, path string) error {
 
 // Log returns paginated commit history scoped to a file path.
 func (r *Repository) Log(ctx context.Context, path string, page, pageSize int) ([]Commit, bool, error) {
-	ctx, cancel := ensureContext(ctx)
+	ctx, cancel := r.ensureContext(ctx)
 	defer cancel()
 
 	r.mu.Lock()
@@ -216,7 +217,7 @@ func (r *Repository) Log(ctx context.Context, path string, page, pageSize int) (
 
 // Diff renders a colored diff between two commits for a path.
 func (r *Repository) Diff(ctx context.Context, path, from, to string) (string, error) {
-	ctx, cancel := ensureContext(ctx)
+	ctx, cancel := r.ensureContext(ctx)
 	defer cancel()
 
 	r.mu.Lock()
@@ -251,7 +252,7 @@ func (r *Repository) WriteFile(path string, data []byte) error {
 
 // Rename moves a file to the desired destination using git mv.
 func (r *Repository) Rename(ctx context.Context, oldPath, newPath string) error {
-	ctx, cancel := ensureContext(ctx)
+	ctx, cancel := r.ensureContext(ctx)
 	defer cancel()
 
 	r.mu.Lock()
@@ -270,7 +271,7 @@ func (r *Repository) Push(ctx context.Context) error {
 		return nil
 	}
 
-	ctx, cancel := ensureContext(ctx)
+	ctx, cancel := r.ensureContext(ctx)
 	defer cancel()
 
 	r.mu.Lock()
@@ -293,7 +294,7 @@ func (r *Repository) CommitChanges(ctx context.Context, paths []string, message 
 		return errors.New("commit message required")
 	}
 
-	ctx, cancel := ensureContext(ctx)
+	ctx, cancel := r.ensureContext(ctx)
 	defer cancel()
 
 	r.mu.Lock()
@@ -357,7 +358,7 @@ func (r *Repository) stageAll(ctx context.Context) error {
 
 // ListTrackedFiles returns all tracked files.
 func (r *Repository) ListTrackedFiles(ctx context.Context) ([]string, error) {
-	ctx, cancel := ensureContext(ctx)
+	ctx, cancel := r.ensureContext(ctx)
 	defer cancel()
 
 	r.mu.Lock()
@@ -386,7 +387,7 @@ func (r *Repository) ensureClone() error {
 	}
 
 	if strings.TrimSpace(r.Remote) == "" {
-		ctx, cancel := context.WithTimeout(context.Background(), CommandTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), r.CommandTimeout)
 		defer cancel()
 
 		cmd := exec.CommandContext(ctx, r.GitPath, "init")
@@ -396,7 +397,7 @@ func (r *Repository) ensureClone() error {
 		}
 		return nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), CommandTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), r.CommandTimeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, r.GitPath, "clone", r.Remote, r.Dir)
@@ -411,16 +412,21 @@ func (r *Repository) command(ctx context.Context, args ...string) *exec.Cmd {
 		ctx = context.Background()
 	}
 
-	cmd := exec.CommandContext(ctx, r.GitPath, args...)
+	baseArgs := []string{
+		"-c", "credential.helper=", // Disable credential helper to prevent daemon spawning
+	}
+	fullArgs := append(baseArgs, args...)
+
+	cmd := exec.CommandContext(ctx, r.GitPath, fullArgs...)
 	cmd.Dir = r.Dir
 	return cmd
 }
 
-func ensureContext(ctx context.Context) (context.Context, context.CancelFunc) {
+func (r *Repository) ensureContext(ctx context.Context) (context.Context, context.CancelFunc) {
 	if ctx != nil {
 		return ctx, func() {}
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), CommandTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), r.CommandTimeout)
 	return ctx, cancel
 }
 
@@ -480,7 +486,7 @@ func (r *Repository) ResetSoft(ctx context.Context, target string) error {
 		return errors.New("reset target required")
 	}
 
-	ctx, cancel := ensureContext(ctx)
+	ctx, cancel := r.ensureContext(ctx)
 	defer cancel()
 
 	r.mu.Lock()
